@@ -16,6 +16,7 @@ from lightning import seed_everything
 
 from transformers import AutoTokenizer, AutoModel
 from evaluation.llada_generation import generate
+from utils.device import get_torch_device
 
 
 def set_seed(seed):
@@ -40,7 +41,7 @@ class LLaDAEvalHarness(LM):
         gen_length=1024,
         block_length=1024,
         remasking="low_confidence",
-        device="cuda",
+        device=get_torch_device(),
         **kwargs,
     ):
         """
@@ -263,7 +264,11 @@ class LLaDAEvalHarness(LM):
                 is_target_greedy_dec = self.suffix_greedy_prediction(prefix, target)
 
                 out.append((ll, 1.0 if is_target_greedy_dec else 0.0))
-        torch.cuda.empty_cache()
+
+        if self.device == "cuda":
+            torch.cuda.empty_cache()
+        elif self.device == "mps":
+            torch.mps.empty_cache()
         return out
 
     def loglikelihood_rolling(self, requests):
