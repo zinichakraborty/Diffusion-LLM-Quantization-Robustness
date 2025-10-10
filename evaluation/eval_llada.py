@@ -319,8 +319,9 @@ class LLaDAEvalHarness(LM):
                 generated_answer_ids, skip_special_tokens=True
             )
             out.append(generated_answer)
-
-            self.accelerator.wait_for_everyone()
+            
+            if self.accelerator is not None:
+                self.accelerator.wait_for_everyone()
 
         return out
 
