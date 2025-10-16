@@ -6,12 +6,17 @@ requires-python = ">=3.12"
 dependencies = [
     "accelerate==0.34.2",
     "antlr4-python3-runtime==4.11",
+    "causal-conv1d",
     "hf-xet>=1.1.10",
     "huggingface-hub>=0.35.3",
     "lightning>=2.5.5",
     "lm-eval==0.4.8",
+    "mamba-ssm",
     "math-verify>=0.8.0",
+    "numpy>=2.3.3",
     "sympy>=1.14.0",
+    "tiktoken>=0.12.0",
+    "torch==2.7.*",
     "tqdm>=4.67.1",
     "transformers[torch]==4.49.0",
 ]
@@ -21,3 +26,7 @@ dev = ["poethepoet>=0.37.0"]
 
 [tool.poe.tasks]
 test_llada = "python -m evaluation.llada_generation"
+
+[tool.uv.sources]
+mamba-ssm = { url = "https://github.com/state-spaces/mamba/releases/download/v2.2.6.post3/mamba_ssm-2.2.6.post3+cu12torch2.7cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
+causal-conv1d = { url = "https://github.com/Dao-AILab/causal-conv1d/releases/download/v1.5.3.post1/causal_conv1d-1.5.3.post1+cu12torch2.7cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
