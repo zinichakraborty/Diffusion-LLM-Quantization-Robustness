@@ -27,7 +27,7 @@ args=(
   --device cuda
   --batch_size {batch_size}
   --num_fewshot 0
-  --output_path "{results_dir}/{evaluation_set}_evaluation_on_{model}.json"
+  --output_path "{results_dir}/{evaluation_set}_evaluation_on_{model}"
   --log_samples
   --confirm_run_unsafe_code
   --apply_chat_template true

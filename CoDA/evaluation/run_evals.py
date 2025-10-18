@@ -37,7 +37,7 @@ def create_jobs(model, results_dir):
     job_ids = []
     for evaluation_set in EVALUATION_SETS:
         script = SCRIPT_TEMPLATE.format(model=model, results_dir=results_dir, evaluation_set=evaluation_set, batch_size=BATCH_SIZE).strip()
-        job_name = JOB_NAME_TEMPLATE.format(evaluation_set=evaluation_set, model=model).strip()
+        job_name = JOB_NAME_TEMPLATE.format(evaluation_set=evaluation_set, model=model.replace("/", "_")).strip()
         log_output = LOG_FILE_PATH_TEMPLATE.format(evaluation_set=evaluation_set, model=model.replace("/", "_")).strip()
         job_id = submit_job(script, job_name, log_output)
         job_ids.append(job_id)
