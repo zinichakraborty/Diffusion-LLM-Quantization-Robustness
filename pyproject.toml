@@ -6,11 +6,13 @@ requires-python = ">=3.12"
 dependencies = [
     "accelerate==0.34.2",
     "antlr4-python3-runtime==4.11",
+    "cython>=3.1.4",
     "hf-xet>=1.1.10",
     "huggingface-hub>=0.35.3",
     "lightning>=2.5.5",
     "lm-eval==0.4.8",
     "math-verify>=0.8.0",
+    "pyslurm",
     "sympy>=1.14.0",
     "tqdm>=4.67.1",
     "transformers[torch]==4.49.0",
@@ -21,3 +23,6 @@ dev = ["poethepoet>=0.37.0"]
 
 [tool.poe.tasks]
 test_llada = "python -m evaluation.llada_generation"
+
+[tool.uv.sources]
+pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", rev = "24.11.x" }
