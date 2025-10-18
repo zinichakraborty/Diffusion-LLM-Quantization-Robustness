@@ -1,11 +1,10 @@
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModel
 import torch
 
 model_name = "Salesforce/CoDA-v0-Instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 # Load with AutoModel to get the base model
-from transformers import AutoModel
 model = AutoModel.from_pretrained(model_name, trust_remote_code=True, device_map="cuda", torch_dtype=torch.bfloat16)
 
 prompt = "Write a Python function to calculate fibonacci numbers"
