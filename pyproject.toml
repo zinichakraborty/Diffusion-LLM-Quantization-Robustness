@@ -24,6 +24,7 @@ dependencies = [
     "torch>=2.8.0",
     "tqdm>=4.67.1",
     "transformers[torch]==4.49.0",
+    "vptq",
 ]
 
 [dependency-groups]
@@ -34,3 +35,4 @@ test_llada = "python -m evaluation.llada_generation"
 
 [tool.uv.sources]
 pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", rev = "24.11.x" }
+vptq = { git = "https://github.com/microsoft/VPTQ.git" }
