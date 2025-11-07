@@ -28,6 +28,7 @@ tqdm = ">=4.67.1, <5"
 transformers = { version = "==4.49.0", extras = ["torch"] }
 pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", branch = "24.11.x" }
 gptqmodel = ">=4.2.5, <5"
+vptq = { git = "https://github.com/microsoft/VPTQ" }
 
 [pypi-options]
-no-build-isolation = ["gptqmodel"]
+no-build-isolation = ["vptq", "gptqmodel"]
