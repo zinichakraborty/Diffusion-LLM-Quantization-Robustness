@@ -3,7 +3,7 @@ Research repository for research2
 
 ## Environment Setup
 
-1. Run `salloc --gpus=1 --mem=500G`
+1. Run `salloc --gpus=1 --mem=100G --ntasks-per-node=24`
 2. Install `uv`: <https://docs.astral.sh/uv/getting-started/installation/>. On PACE, do `module load uv` 
 3. Set the following environment variables:
 ```bash

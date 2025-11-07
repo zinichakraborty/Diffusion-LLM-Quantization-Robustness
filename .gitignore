@@ -262,3 +262,6 @@ $RECYCLE.BIN/
 
 logs
 CoDA/gptq_experiments/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

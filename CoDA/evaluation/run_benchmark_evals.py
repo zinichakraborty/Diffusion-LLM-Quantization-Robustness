@@ -1,6 +1,6 @@
 import argparse
 from pathlib import Path
-from utils import EVALUATION_SETS, SCRIPT_TEMPLATE, JOB_NAME_TEMPLATE, LOG_FILE_PATH_TEMPLATE, MEM, GRES_GPU, TIME, BATCH_SIZE
+from utils.eval_utils import EVALUATION_SETS, SCRIPT_TEMPLATE, JOB_NAME_TEMPLATE, LOG_FILE_PATH_TEMPLATE, MEM, GRES_GPU, TIME, BATCH_SIZE
 import pyslurm
 
 def parse_args():
