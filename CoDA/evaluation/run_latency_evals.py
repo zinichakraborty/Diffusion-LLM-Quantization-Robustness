@@ -102,7 +102,7 @@ def main():
     models_dir = Path(args.models_dir)
     
     print(f"Looking for GPTQ models in {models_dir}")
-    print("Results will be saved in each model's directory as latency_result.json")
+    print("Results will be saved in each model's directory as latency_result_timestamp.json")
     
     create_jobs(models_dir, args.num_runs, args.warmup_runs)
     

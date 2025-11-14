@@ -5,6 +5,8 @@ import torch
 from pathlib import Path
 from typing import List
 import statistics
+from datetime import datetime
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -182,7 +184,8 @@ def save_results(model_dir: Path, latencies: List[float]):
         "num_runs": len(latencies)
     }
     
-    output_path = model_dir / "latency_result.json"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = model_dir / f"latency_result_{timestamp}.json"
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
     

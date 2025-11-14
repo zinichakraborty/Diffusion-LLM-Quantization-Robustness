@@ -238,7 +238,7 @@ Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
-
+/CoDA/evalulation/gptq_experiments/gptq_quantized_models/
 # Dump file
 *.stackdump
 
@@ -265,3 +265,5 @@ CoDA/gptq_experiments/
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+CoDA/evaluation/gptq_experiments/gptq_quantized_models

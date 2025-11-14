@@ -2,7 +2,7 @@
 JOB_NAME_TEMPLATE = "Latency_evaluation_on_{model}"
 NODES = 1
 MEM = "500G"
-GRES_GPU = "gpu:rtx_6000:1"
+GRES_GPU = "gpu:a100:1"
 TIME = "1:00:00"
 LOG_FILE_PATH_TEMPLATE = "./logs/latency_evaluation_on_{model}.out"
 MAIL_TYPE = "BEGIN,END,FAIL"
