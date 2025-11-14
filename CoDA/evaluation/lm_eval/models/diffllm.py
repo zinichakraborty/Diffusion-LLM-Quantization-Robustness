@@ -210,6 +210,7 @@ class DiffLLM(LM):
                 pretrained,
                 torch_dtype=get_dtype(dtype),
                 trust_remote_code=trust_remote_code,
+                ignore_mismatched_sizes=True,
             )
             .eval()
         ).to(self.device)
