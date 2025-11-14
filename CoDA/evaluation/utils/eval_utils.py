@@ -32,7 +32,7 @@ args=(
   --confirm_run_unsafe_code
   --apply_chat_template true
 )
-srun uv run accelerate launch -m lm_eval "${{args[@]}}"
+srun pixi run accelerate launch -m lm_eval "${{args[@]}}"
 """
 
 EVALUATION_SETS = ["humaneval_instruct", "humaneval_plus", "mbpp_instruct", "mbpp_plus_instruct"]

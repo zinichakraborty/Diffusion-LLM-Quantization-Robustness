@@ -16,8 +16,8 @@ export CMAKE_ARGS='-DCMAKE_CUDA_ARCHITECTURES=70;75;80;86;89;90 -DUSER_CUDA_ARCH
 5. Run `pixi install` to setup virtual environment
 6. Run `exit`
 
-To test running `LLaDA-8B-Instruct`, run `uv run poe test_execute_model`
+To test running `LLaDA-8B-Instruct`, run `pixi run poe test_execute_model`
 
 ## Running Evaluations
 
-1. TODO: Run `uv run python -m evaluation.run_evals`
+1. TODO: Run `pixi run python -m evaluation.run_evals`

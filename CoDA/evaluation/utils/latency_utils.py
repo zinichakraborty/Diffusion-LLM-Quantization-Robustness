@@ -17,5 +17,5 @@ export HF_ALLOW_CODE_EVAL=1
 export SLURM_INCLUDE_DIR=/opt/slurm/current/include
 export SLURM_LIB_DIR=/opt/slurm/current/lib
 
-srun uv run python test_latency.py --model-dir "{model_dir}" --num-runs {num_runs} --warmup-runs {warmup_runs}
+srun pixi run python test_latency.py --model-dir "{model_dir}" --num-runs {num_runs} --warmup-runs {warmup_runs}
 """
