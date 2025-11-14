@@ -6,7 +6,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 # Load with AutoModel to get the base model
 from transformers import AutoModel
-model = AutoModel.from_pretrained(model_name, trust_remote_code=True, device_map="cuda", torch_dtype=torch.bfloat16)
+model = AutoModel.from_pretrained(model_name, trust_remote_code=True, device_map="cuda", torch_dtype=torch.bfloat16, attn_implementation="eager")
 
 prompt = "Write a Python function to calculate fibonacci numbers"
 inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
@@ -17,7 +17,7 @@ if hasattr(model, 'diffusion_generate'):
     print("===== generating with diffusion_generate =====")
     outputs = model.diffusion_generate(
         inputs.input_ids,
-        num_steps=4,
+        num_steps=1024,
         max_length=256
     )
 elif hasattr(model, 'sample'):
