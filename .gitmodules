@@ -1,0 +1,6 @@
+[submodule "CoDA-HAWQ"]
+	path = CoDA-HAWQ
+	url = https://github.com/aaravg04/CoDA-HAWQ.git
+[submodule "hawq/sft/DiffuLLaMA-HAWQ"]
+	path = hawq/sft/DiffuLLaMA-HAWQ
+	url = https://github.com/aaravg04/DiffuLLaMA-HAWQ.git
