@@ -84,11 +84,11 @@ def _coerce_attn_impl(attn_impl: str) -> str:
         print("[Note] sm<80 detected; coercing attn_implementation -> 'sdpa'.")
         return "sdpa"
     return attn_impl
-    if mask.dtype == torch.bool:
-        add = torch.zeros_like(mask, dtype=target_dtype)
-        add = add.masked_fill(~mask, float("-inf"))
-        return add
-    return mask.to(target_dtype)
+    # if mask.dtype == torch.bool:
+    #     add = torch.zeros_like(mask, dtype=target_dtype)
+    #     add = add.masked_fill(~mask, float("-inf"))
+    #     return add
+    # return mask.to(target_dtype)
 
 def load_base_model(args, torch_dtype, attn_impl):
     cfg = None

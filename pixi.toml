@@ -15,6 +15,7 @@ GPTQMODEL_BUILD_EXLLAMA_V1 = "1"
 GPTQMODEL_BUILD_AWQ = "1"
 GPTQMODEL_BUILD_MARLIN = "1"
 GPTQMODEL_BUILD_MACHETE = "1"
+TORCH_VERSION = "2.8"
 
 [tasks]
 
@@ -22,14 +23,15 @@ GPTQMODEL_BUILD_MACHETE = "1"
 cython = "*"
 setuptools = ">=80.9.0,<81"
 python = "3.12.*"
+wandb = ">=0.22.3,<0.23"
 
 [pypi-dependencies]
-device-smi = ">=0.5.1, <0.6"
+# device-smi = ">=0.5.1, <0.6"
 hf-xet = ">=1.2.0, <2"
 huggingface-hub = ">=0.36.0, <0.37"
 lightning = ">=2.5.6, <3"
 lm-eval = ">=0.4.9.1, <0.5"
-logbar = ">=0.1.8, <0.2"
+# logbar = ">=0.1.8, <0.2"
 math-verify = ">=0.8.0, <0.9"
 optimum = ">=2.0.0, <3"
 pillow = ">=12.0.0, <13"
@@ -38,9 +40,9 @@ sympy = ">=1.14.0, <2"
 tokenicer = ">=0.0.5, <0.0.6"
 torch = ">=2.8.0"
 tqdm = ">=4.67.1, <5"
-transformers = { version = ">=4.57.1, <5", extras = ["torch"] }
+transformers = { version = "==4.51.2", extras = ["torch"] }
 pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", branch = "24.11.x" }
-gptqmodel = { git = "https://github.com/ModelCloud/GPTQModel.git"}
+gptqmodel = { git = "https://github.com/guru-desh/GPTQModel", branch = "hotfix-v4.2.5" }
 #vptq = { git = "https://github.com/microsoft/VPTQ" }
 #autogptq = { git = "https://github.com/AutoGPTQ/AutoGPTQ.git", extras = ["triton"] }
 

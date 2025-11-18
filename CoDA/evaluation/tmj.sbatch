@@ -8,14 +8,11 @@
 
 #SBATCH --mem=500G
 
-#SBATCH --gres=gpu:h100:1
+#SBATCH --gres=gpu:l40s:1
 
 #SBATCH --time=5:00:00
 
 #SBATCH --output=./logs/%x_%j.out
-
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=agupta965@gatech.edu            # e-mail address for notifications
 
  
 ########################
@@ -26,9 +23,9 @@
  
 # Model + paths (EDIT THESE)
 
-MODEL="/storage/ice1/0/7/agupta965/research2/coda-3poch-gsm"
+MODEL="/home/hice1/gdeshpande9/scratch/SMR_Project/hawq/sft/checkpoints/final_model"
 
-SAFE_MODEL_NAME="coda3poch_gsm"
+SAFE_MODEL_NAME="finetuned_model"
 
 RESULTS_DIR="./results"
 
@@ -36,7 +33,7 @@ LOG_DIR="./logs"
  
 # Eval config
 
-BATCH_SIZE=4
+BATCH_SIZE=1
  
 # Evaluation sets
 
