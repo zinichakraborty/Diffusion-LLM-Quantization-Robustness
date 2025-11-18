@@ -7,8 +7,14 @@ version = "0.1.0"
 [activation.env]
 SLURM_INCLUDE_DIR = "/opt/slurm/current/include"
 SLURM_LIB_DIR = "/opt/slurm/current/lib"
-TORCH_CUDA_ARCH_LIST = "7.0;7.5;8.0;8.6;8.9;9.0+PTX"
-CMAKE_ARGS = "-DCMAKE_CUDA_ARCHITECTURES=70;75;80;86;89;90 -DUSER_CUDA_ARCH_LIST=7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+#TORCH_CUDA_ARCH_LIST = "7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+#CMAKE_ARGS = "-DCMAKE_CUDA_ARCHITECTURES=70;75;80;86;89;90 -DUSER_CUDA_ARCH_LIST=7.0;7.5;8.0;8.6;8.9;9.0+PTX"
+FORCE_BUILD = "1"
+GPTQMODEL_BUILD_EXLLAMA_V2 = "1"
+GPTQMODEL_BUILD_EXLLAMA_V1 = "1"
+GPTQMODEL_BUILD_AWQ = "1"
+GPTQMODEL_BUILD_MARLIN = "1"
+GPTQMODEL_BUILD_MACHETE = "1"
 
 [tasks]
 
@@ -32,11 +38,13 @@ sympy = ">=1.14.0, <2"
 tokenicer = ">=0.0.5, <0.0.6"
 torch = ">=2.8.0"
 tqdm = ">=4.67.1, <5"
-transformers = { version = "==4.49.0", extras = ["torch"] }
+transformers = { version = ">=4.57.1, <5", extras = ["torch"] }
 pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", branch = "24.11.x" }
-gptqmodel = ">=4.2.5, <5"
-# vptq = { git = "https://github.com/microsoft/VPTQ" }
+gptqmodel = { git = "https://github.com/ModelCloud/GPTQModel.git"}
+#vptq = { git = "https://github.com/microsoft/VPTQ" }
+#autogptq = { git = "https://github.com/AutoGPTQ/AutoGPTQ.git", extras = ["triton"] }
 
 [pypi-options]
-# no-build-isolation = ["vptq", "gptqmodel"]
 no-build-isolation = ["gptqmodel"]
+#no-build-isolation = ["vptq", "gptqmodel"]
+#no-build-isolation = ["autogptq"]

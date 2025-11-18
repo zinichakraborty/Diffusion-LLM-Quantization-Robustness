@@ -10,7 +10,7 @@ from typing import List, Optional
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--model-name", type=str, default="Salesforce/CoDA-v0-Instruct")
-    p.add_argument("--torch-dtype", type=str, choices=["bfloat16","float16","float32"], default="bfloat16")
+    p.add_argument("--torch-dtype", type=str, choices=["bfloat16","float16","float32"], default="float16")
     p.add_argument("--attn-impl", type=str, choices=["auto","eager","sdpa","flash_attention_2"], default="auto")
     p.add_argument("--num-runs", type=int, default=100)
     p.add_argument("--warmup-runs", type=int, default=10)
