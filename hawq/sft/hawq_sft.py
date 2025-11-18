@@ -721,17 +721,17 @@ def train_diffusion_model(
     model = DiffusionLM(model_name, device, use_flash_attention=use_flash_attention)
     
     # Resize token embeddings if needed
-    if needs_resize and len(tokenizer) > model.vocab_size:
-        print(f"\nResizing token embeddings from {model.vocab_size} to {len(tokenizer)}")
-        model.model.resize_token_embeddings(len(tokenizer))
-        model.vocab_size = model.model.config.vocab_size  # Get from config after resize
-        print(f"Model vocab size after resize: {model.vocab_size}")
-    elif len(tokenizer) != model.vocab_size:
-        print(f"\nWARNING: Tokenizer vocab size ({len(tokenizer)}) != model vocab size ({model.vocab_size})")
-        print("Resizing to match tokenizer...")
-        model.model.resize_token_embeddings(len(tokenizer))
-        model.vocab_size = model.model.config.vocab_size  # Get from config after resize
-        print(f"Model vocab size after resize: {model.vocab_size}")
+    # if needs_resize and len(tokenizer) > model.vocab_size:
+    #     print(f"\nResizing token embeddings from {model.vocab_size} to {len(tokenizer)}")
+    #     model.model.resize_token_embeddings(len(tokenizer))
+    #     model.vocab_size = model.model.config.vocab_size  # Get from config after resize
+    #     print(f"Model vocab size after resize: {model.vocab_size}")
+    # elif len(tokenizer) != model.vocab_size:
+    #     print(f"\nWARNING: Tokenizer vocab size ({len(tokenizer)}) != model vocab size ({model.vocab_size})")
+    #     print("Resizing to match tokenizer...")
+    #     model.model.resize_token_embeddings(len(tokenizer))
+    #     model.vocab_size = model.model.config.vocab_size  # Get from config after resize
+    #     print(f"Model vocab size after resize: {model.vocab_size}")
     
     # Move model to device
     print(f"Moving model to {device}...")

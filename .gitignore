@@ -2,3 +2,4 @@
 **/*.pt
 **/__pycache__/*
 **/checkpoints/final_model/*
+**/gptq_quantized_models/*

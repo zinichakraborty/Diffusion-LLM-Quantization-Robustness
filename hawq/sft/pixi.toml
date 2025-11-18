@@ -4,6 +4,10 @@ name = "SMR_Project"
 platforms = ["linux-64"]
 version = "0.1.0"
 
+[activation.env]
+SLURM_INCLUDE_DIR = "/opt/slurm/current/include"
+SLURM_LIB_DIR = "/opt/slurm/current/lib"
+
 [tasks]
 
 [dependencies]
@@ -30,7 +34,7 @@ tqdm = ">=4.67.1, <5"
 transformers = { version = "==4.49.0", extras = ["torch"] }
 pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", branch = "24.11.x" }
 gptqmodel = ">=4.2.5, <5"
-vptq = { git = "https://github.com/microsoft/VPTQ" }
+#vptq = { git = "https://github.com/microsoft/VPTQ" }
 
 [pypi-options]
-no-build-isolation = ["vptq", "gptqmodel"]
+no-build-isolation = ["gptqmodel"]
