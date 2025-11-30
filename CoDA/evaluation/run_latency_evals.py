@@ -60,9 +60,10 @@ def submit_job(script, job_name, log_output):
         name=job_name,
         time_limit=TIME,
         nodes=1,
+        gres_per_node=GRES_GPU,
         # memory_per_node=MEM,
         # gres_per_node=GRES_GPU,
-        gpus=1,
+        # gpus=1,
         standard_output=log_output,
         standard_error=log_output,
         script=script,
@@ -77,6 +78,8 @@ def create_jobs(models_dir: Path, num_runs: int, warmup_runs: int):
     job_ids = []
     
     for model_dir in model_dirs:
+        if model_dir.name.startswith("Salesforce"):
+            continue  # Skip CoDA directory if present
         safe_name = safe_model_name(model_dir)
         # Use absolute path for model directory
         model_dir_abs = model_dir.resolve()

@@ -5,12 +5,15 @@ BATCH_SIZE = 4
 JOB_NAME_TEMPLATE = "Task_{evaluation_set}_evaluation_on_{model}"
 NODES = 1
 MEM = "500G"
-GRES_GPU = "gpu:a100:1"
+GRES_GPU = "gpu:l40s:1"
 TIME = "5:00:00"
 LOG_FILE_PATH_TEMPLATE = "./logs/{evaluation_set}_evaluation_on_{model}.out"
 MAIL_TYPE = "BEGIN,END,FAIL"
 
 # Script template for each evaluation set
+# For Qwen3, we use the standard HF backend in lm-eval.
+# `{model}` should be either the HF hub id (e.g. "Qwen/Qwen3-1.7B-Instruct")
+# or a local path to your quantized Qwen3 directory.
 SCRIPT_TEMPLATE = """
 #!/bin/bash
 
@@ -21,8 +24,8 @@ export SLURM_INCLUDE_DIR=/opt/slurm/current/include
 export SLURM_LIB_DIR=/opt/slurm/current/lib
 
 args=(
-  --model diffllm
-  --model_args "pretrained={model},trust_remote_code=True,max_new_tokens=768,diffusion_steps=768,dtype=bfloat16,temperature=0.1,top_p=0.9,alg=entropy"
+  --model hf
+  --model_args "pretrained={model},trust_remote_code=True,dtype=bfloat16,max_new_tokens=768"
   --tasks {evaluation_set}
   --device cuda
   --batch_size {batch_size}
@@ -32,7 +35,14 @@ args=(
   --confirm_run_unsafe_code
   --apply_chat_template true
 )
-srun uv run accelerate launch -m lm_eval "${{args[@]}}"
+
+eval "$(pixi shell-hook)"
+srun pixi run accelerate launch -m lm_eval "${{args[@]}}"
 """
 
-EVALUATION_SETS = ["humaneval_instruct", "humaneval_plus", "mbpp_instruct", "mbpp_plus_instruct"]
+EVALUATION_SETS = [
+    "humaneval_instruct",
+    "humaneval_plus",
+    "mbpp_instruct",
+    "mbpp_plus_instruct",
+]

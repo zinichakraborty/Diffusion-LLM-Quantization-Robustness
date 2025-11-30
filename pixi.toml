@@ -7,6 +7,7 @@ version = "0.1.0"
 [tasks]
 
 [dependencies]
+python = "3.11.*"
 cython = "*"
 setuptools = ">=80.9.0,<81"
 
@@ -25,8 +26,7 @@ sympy = ">=1.14.0, <2"
 tokenicer = ">=0.0.5, <0.0.6"
 torch = ">=2.8.0"
 tqdm = ">=4.67.1, <5"
-transformers = { version = "==4.51.0", extras = ["torch"] }
-pyslurm = { git = "https://github.com/PySlurm/pyslurm.git", branch = "24.11.x" }
+transformers = { version = "==4.57.1", extras = ["torch"] }
 gptqmodel = ">=4.2.5, <5"
 
 [pypi-options]

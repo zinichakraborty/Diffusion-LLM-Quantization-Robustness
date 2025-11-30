@@ -14,10 +14,6 @@ def create_results_dir(results_dir):
     results_dir.mkdir(parents=True, exist_ok=True)
     return results_dir
 
-def check_model(model):
-    if not Path(model).exists() and not model.startswith("Salesforce/"):
-        raise FileNotFoundError(f"Model path {model} does not exist or is not a Salesforce model")
-
 def submit_job(script, job_name, log_output):
     desc = pyslurm.JobSubmitDescription(
         name=job_name,
@@ -51,7 +47,6 @@ def main():
     model = args.model
     results_dir = args.results_dir
     
-    check_model(model)
     results_dir = create_results_dir(results_dir)
     print(f"Results will be stored in {results_dir}")
     
