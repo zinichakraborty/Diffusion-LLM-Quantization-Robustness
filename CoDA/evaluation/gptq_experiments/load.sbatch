@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=load_qwen
 #SBATCH --partition=ice-gpu
-#SBATCH --gres=gpu:rtx_6000:1
-#SBATCH --cpus-per-task=8
+#SBATCH --gres=gpu:l40s:1
 #SBATCH --mem=256G
 #SBATCH --time=6:00:00
 #SBATCH --output=logs/%j.out

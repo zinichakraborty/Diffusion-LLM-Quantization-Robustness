@@ -6,7 +6,7 @@ import torch
 from transformers import AutoModel, AutoTokenizer, GenerationConfig
 from safetensors.torch import save_model
 
-RESULTS_DIR = "gptq_quantized_models_3"
+RESULTS_DIR = "gptq_quantized_models_4"
 
 CODA_ID = "Salesforce/CoDA-v0-Instruct"
 QWEN3_ID = "Qwen/Qwen3-1.7B"  # HF id for Qwen3 1.7B dense model

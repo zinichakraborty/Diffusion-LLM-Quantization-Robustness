@@ -13,7 +13,7 @@ CODA_ID = "Salesforce/CoDA-v0-Instruct"
 QWEN3_ID = "Qwen/Qwen3-1.7B"
 
 CALIBRATION_DATASET = "wikitext2"
-RESULTS_DIR = "gptq_quantized_models"
+RESULTS_DIR = "gptq_quantized_models_4"
 
 
 def safe_name(hub_id: str) -> str:
@@ -151,11 +151,11 @@ def quantize_model(model_id: str, bits: int, dataset: str, device="cuda", use_co
 if __name__ == "__main__":
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    for b in BITS:
-        print("--------------------------------")
-        print(f"Quantizing CoDA {CODA_ID} at {b} bits…")
-        quantize_model(CODA_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=True)
-        print("--------------------------------")
+    # for b in BITS:
+    #     print("--------------------------------")
+    #     print(f"Quantizing CoDA {CODA_ID} at {b} bits…")
+    #     quantize_model(CODA_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=True)
+    #     print("--------------------------------")
 
     for b in BITS:
         print("--------------------------------")
