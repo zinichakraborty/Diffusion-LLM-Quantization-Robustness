@@ -1,22 +1,31 @@
-# pip install --upgrade "optimum>=1.21.0" transformers datasets
+# quantize_coda_and_qwen3_gptq.py
+# pip install --upgrade "optimum>=1.21.0" transformers datasets safetensors
 
 import os
 import torch
 from transformers import AutoModel, AutoTokenizer, GenerationConfig
-from optimum.gptq import GPTQQuantizer  # Optimum's programmatic GPTQ
+from optimum.gptq import GPTQQuantizer
 from safetensors.torch import save_model
-# Docs: https://huggingface.co/docs/optimum/llm_quantization/usage_guides/quantization
 
 BITS = [2, 3, 4, 8]
-MODEL_ID = "Salesforce/CoDA-v0-Instruct"
-CALIBRATION_DATASET = "wikitext2"   # a single string works well
+
+CODA_ID = "Salesforce/CoDA-v0-Instruct"
+QWEN3_ID = "Qwen/Qwen3-1.7B"
+
+CALIBRATION_DATASET = "wikitext2"
 RESULTS_DIR = "gptq_quantized_models"
+
 
 def safe_name(hub_id: str) -> str:
     return hub_id.replace("/", "__")
 
+
+# =========================
+# CoDA-specific hook logic
+# =========================
+
 # --- pre-hook: fix star-unpacked tensors, handle [T,H] -> [1,T,H], dedupe kwargs ---
-def _pre_hook(module, args, kwargs):
+def _coda_pre_hook(module, args, kwargs):
     # 0) Make sure we can mutate 'args'
     args = tuple(args)
 
@@ -49,18 +58,21 @@ def _pre_hook(module, args, kwargs):
 
     return args, (kwargs or {})
 
+
 # --- post-hook: remove fake batch dim if we added it ---
-def _post_hook(module, args, output):
+def _coda_post_hook(module, args, output):
     if getattr(module, "_coda_squeezed", False) and isinstance(output, torch.Tensor) and output.dim() == 3:
         return output.squeeze(0)                 # back to [T, H]
     return output
 
-def attach_hooks(coda_model):
+
+def attach_coda_hooks(coda_model):
     handles = []
     for block in coda_model.model.layers:
-        handles.append(block.register_forward_pre_hook(_pre_hook, with_kwargs=True))
-        handles.append(block.register_forward_hook(_post_hook))
+        handles.append(block.register_forward_pre_hook(_coda_pre_hook, with_kwargs=True))
+        handles.append(block.register_forward_hook(_coda_post_hook))
     return handles
+
 
 def sanitize_generation_config(model):
     if not hasattr(model, "generation_config") or model.generation_config is None:
@@ -83,10 +95,16 @@ def sanitize_generation_config(model):
         model.generation_config = GenerationConfig()  # minimal, valid config
 
 
-def quantize_coda(model_id: str, bits: int, dataset: str, device="cuda"):
-    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True, use_fast=True)
+def quantize_model(model_id: str, bits: int, dataset: str, device="cuda", use_coda_hooks: bool = False):
+    print(f"\n=== Quantizing {model_id} at {bits} bits (dataset={dataset}) ===")
 
-    # Load CoDA *normally* (no quantization on load)
+    tok = AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True,
+        use_fast=True,
+    )
+
+    # Load base in bf16 on the given device (no quantization yet)
     base = AutoModel.from_pretrained(
         model_id,
         trust_remote_code=True,
@@ -94,13 +112,16 @@ def quantize_coda(model_id: str, bits: int, dataset: str, device="cuda"):
         torch_dtype=torch.bfloat16,
     )
 
-    # Attach temporary hooks so Optimum’s calibration doesn’t trip on packed 2-D tensors
-    hooks = attach_hooks(base)
+    # Attach temporary hooks ONLY for CoDA
+    hooks = []
+    if use_coda_hooks:
+        print("Attaching CoDA hooks for packed [T,H] handling…")
+        hooks = attach_coda_hooks(base)
 
     # Configure and run Optimum's GPTQ quantizer programmatically
     quantizer = GPTQQuantizer(
         bits=bits,
-        dataset=dataset,        # e.g. "wikitext2" or a list[str]
+        dataset=dataset,  # e.g. "wikitext2" or a list[str]
     )
     quantizer.quantize_model(base, tok)  # quantizes in-place
 
@@ -109,25 +130,36 @@ def quantize_coda(model_id: str, bits: int, dataset: str, device="cuda"):
         h.remove()
 
     out_dir = f"{RESULTS_DIR}/{safe_name(model_id)}-{bits}bit-{dataset}"
-    
+
     # ---- make generation_config valid so saving doesn't error ----
     sanitize_generation_config(base)
 
+    os.makedirs(out_dir, exist_ok=True)
     base.config.save_pretrained(out_dir)
     tok.save_pretrained(out_dir)
-    # after saving config/tokenizer
+
     save_model(
         base,
         os.path.join(out_dir, "model.safetensors"),
         metadata={"format": "pt"},   # <-- required for HF loaders
     )
 
-
     print(f"Saved {model_id}-{bits}bit-{dataset} -> {out_dir}")
     return out_dir
 
-for b in BITS:
-    print("--------------------------------")
-    print(f"Quantizing {MODEL_ID}-{b}bit…")
-    quantize_coda(MODEL_ID, b, CALIBRATION_DATASET, device="cuda")
-    print("--------------------------------")
+
+if __name__ == "__main__":
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+
+    for b in BITS:
+        print("--------------------------------")
+        print(f"Quantizing CoDA {CODA_ID} at {b} bits…")
+        quantize_model(CODA_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=True)
+        print("--------------------------------")
+
+    for b in BITS:
+        print("--------------------------------")
+        print(f"Quantizing Qwen3 {QWEN3_ID} at {b} bits…")
+        # Qwen3 uses standard HF transformer layout; no CoDA hooks needed
+        quantize_model(QWEN3_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=False)
+        print("--------------------------------")
