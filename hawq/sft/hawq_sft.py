@@ -662,12 +662,45 @@ def train_diffusion_model(
     print(f"\nLoading tokenizer from: {model_name}")
     try:
         # Try fast tokenizer first
-        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, use_fast=True)
+        if "CoDA" in model_name:
+            # codamodel, load direct tokenizer
+            print("CoDA model detected, loading from directory \"research2/hawq/sft/CoDALanguageModel\"")
+            # tokenizer = AutoTokenizer.from_pretrained(
+            #     "/storage/ice1/0/7/agupta965/research2/hawq/sft/CoDALanguageModel",
+            #     trust_remote_code=True,
+            #     use_fast=True
+            # )
+            tokenizer = AutoTokenizer.from_pretrained(
+                'Salesforce/CoDA-v0-Instruct',
+                trust_remote_code=True,
+                use_fast=True
+            )
+
+            print(f"loaded coda tokenizer with length {len(tokenizer)}")
+        else:
+            print("coda not in modelname")
+            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, use_fast=True)
+        
         print("Successfully loaded fast tokenizer")
     except Exception as e:
         print(f"Fast tokenizer failed ({e.__class__.__name__}), falling back to slow tokenizer...")
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, use_fast=False)
+            if "CoDA" in model_name:
+                # codamodel, load direct tokenizer
+                print("CoDA model detected, loading from directory \"research2/hawq/sft/CoDALanguageModel\"")
+                # tokenizer = AutoTokenizer.from_pretrained(
+                #     "/storage/ice1/0/7/agupta965/research2/hawq/sft/CoDALanguageModel",
+                #     trust_remote_code=True,
+                #     use_fast=False
+                # )
+                tokenizer = AutoTokenizer.from_pretrained(
+                    'Salesforce/CoDA-v0-Instruct',
+                    trust_remote_code=True,
+                    use_fast=False
+                )
+                print(f"loaded coda tokenizer with length {len(tokenizer)}")
+            else:
+                tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True, use_fast=False)
             print("Successfully loaded slow tokenizer")
         except Exception as e2:
             print(f"ERROR: Both fast and slow tokenizer loading failed!")
@@ -923,60 +956,60 @@ def train_diffusion_model(
                     # Gradient clipping for stability
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_norm)
                     
-                    # Compute Hessian-based sensitivity if enabled
-                    if track_hessian and global_step % hessian_freq == 0:
-                        print(f"\n{'─'*60}")
-                        print(f"[Step {global_step}] Computing Layer Sensitivities...")
-                        print(f"{'─'*60}")
-                        try:
-                            # Compute layer-wise sensitivity
-                            layer_sens = compute_layer_sensitivity(model, final_loss)
-                            
-                            # Log top 10 most sensitive layers
-                            sorted_layers = sorted(
-                                layer_sens.items(), 
-                                key=lambda x: x[1]['mean'], 
-                                reverse=True
-                            )[:10]
-                            
-                            print("\nTop 10 Most Sensitive Layers:")
-                            for i, (layer_name, sens_info) in enumerate(sorted_layers, 1):
-                                print(f"  {i:2d}. {layer_name:<40} mean={sens_info['mean']:.6f}, max={sens_info['max']:.6f}")
-                            
-                            if use_wandb:
-                                # Log sensitivity metrics
-                                for layer_name, sens_info in sorted_layers:
-                                    wandb.log({
-                                        f'sensitivity/{layer_name}/mean': sens_info['mean'],
-                                        f'sensitivity/{layer_name}/max': sens_info['max'],
-                                        f'sensitivity/{layer_name}/std': sens_info['std'],
-                                        'step': global_step
-                                    })
-                            
-                            # Compute Hessian-aware quantization info
-                            hessian_info = hessian_aware_analysis(model, final_loss)
-                            
-                            # Show top 5 parameters by sensitivity
-                            print("\nTop 5 Parameters by Sensitivity (S_i = λ_i / n_i):")
-                            for i, (param_name, info) in enumerate(list(hessian_info.items())[:5], 1):
-                                print(f"  {i}. {param_name[:50]:<50} S_i={info['sensitivity']:.8f}")
-                            
-                            # Save sensitivity analysis
-                            sens_path = os.path.join(save_dir, f'sensitivity_step_{global_step}.pt')
-                            torch.save({
-                                'layer_sensitivity': layer_sens,
-                                'hessian_info': hessian_info,
-                                'global_step': global_step,
-                                'epoch': epoch
-                            }, sens_path)
-                            print(f"\nSensitivity analysis saved to: {sens_path}")
-                            print(f"{'─'*60}\n")
-                            
-                        except Exception as e:
-                            print(f"Error computing sensitivities: {e}")
-                            import traceback
-                            traceback.print_exc()
-                    
+                # Compute Hessian-based sensitivity if enabled
+                if track_hessian and global_step % hessian_freq == 0:
+                    print(f"\n{'─'*60}")
+                    print(f"[Step {global_step}] Computing Layer Sensitivities...")
+                    print(f"{'─'*60}")
+                    try:
+                        # Compute layer-wise sensitivity
+                        layer_sens = compute_layer_sensitivity(model, final_loss)
+                        
+                        # Log top 10 most sensitive layers
+                        sorted_layers = sorted(
+                            layer_sens.items(), 
+                            key=lambda x: x[1]['mean'], 
+                            reverse=True
+                        )[:10]
+                        
+                        print("\nTop 10 Most Sensitive Layers:")
+                        for i, (layer_name, sens_info) in enumerate(sorted_layers, 1):
+                            print(f"  {i:2d}. {layer_name:<40} mean={sens_info['mean']:.6f}, max={sens_info['max']:.6f}")
+                        
+                        if use_wandb:
+                            # Log sensitivity metrics
+                            for layer_name, sens_info in sorted_layers:
+                                wandb.log({
+                                    f'sensitivity/{layer_name}/mean': sens_info['mean'],
+                                    f'sensitivity/{layer_name}/max': sens_info['max'],
+                                    f'sensitivity/{layer_name}/std': sens_info['std'],
+                                    'step': global_step
+                                })
+                        
+                        # Compute Hessian-aware quantization info
+                        hessian_info = hessian_aware_analysis(model, final_loss)
+                        
+                        # Show top 5 parameters by sensitivity
+                        print("\nTop 5 Parameters by Sensitivity (S_i = λ_i / n_i):")
+                        for i, (param_name, info) in enumerate(list(hessian_info.items())[:5], 1):
+                            print(f"  {i}. {param_name[:50]:<50} S_i={info['sensitivity']:.8f}")
+                        
+                        # Save sensitivity analysis
+                        sens_path = os.path.join(save_dir, f'sensitivity_step_{global_step}.pt')
+                        torch.save({
+                            'layer_sensitivity': layer_sens,
+                            'hessian_info': hessian_info,
+                            'global_step': global_step,
+                            'epoch': epoch
+                        }, sens_path)
+                        print(f"\nSensitivity analysis saved to: {sens_path}")
+                        print(f"{'─'*60}\n")
+                        
+                    except Exception as e:
+                        print(f"Error computing sensitivities: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
                     optimizer.step()
                     optimizer.zero_grad()
                 
@@ -1027,23 +1060,24 @@ def train_diffusion_model(
         print(f"  Processed Batches: {num_batches}/{len(train_loader)}")
         
         # Save checkpoint
-        checkpoint_path = os.path.join(save_dir, f'checkpoint_epoch_{epoch+1}.pt')
-        print(f"  Saving checkpoint to {checkpoint_path}")
-        torch.save({
-            'epoch': epoch,
-            'global_step': global_step,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': avg_loss,
-            'config': {
-                'model_name': model_name,
-                'vocab_size': len(tokenizer),
-                'mask_token_id': mask_token_id,
-                'diffusion_steps': diffusion_steps,
-                'anneal_steps': anneal_steps,
-                'use_shift': use_shift,
-            }
-        }, checkpoint_path)
+        if epoch%5 == 0:
+            checkpoint_path = os.path.join(save_dir, f'checkpoint_epoch_{epoch+1}.pt')
+            print(f"  Saving checkpoint to {checkpoint_path}")
+            torch.save({
+                'epoch': epoch,
+                'global_step': global_step,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': avg_loss,
+                'config': {
+                    'model_name': model_name,
+                    'vocab_size': len(tokenizer),
+                    'mask_token_id': mask_token_id,
+                    'diffusion_steps': diffusion_steps,
+                    'anneal_steps': anneal_steps,
+                    'use_shift': use_shift,
+                }
+            }, checkpoint_path)
         
         if use_wandb:
             wandb.log({
