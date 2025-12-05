@@ -5,9 +5,10 @@ import argparse
 import math
 import warnings
 
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoConfig, AutoModel
 from transformers import GenerationConfig
@@ -555,6 +556,23 @@ def train_coda_ddm_sft(
     else:
         raise ValueError(f"Unknown task '{task}'. Supported: 'gsm8k', 'wikitext2'.")
 
+
+    # randomly select 10% of dataset as representative subset
+    # to avoid issues with high latency of hessian computation
+    # fraction = 0.05
+    # num_samples = int(len(train_dataset) * fraction)
+
+    # indices = np.random.choice(len(train_dataset), num_samples, replace=False)
+    # subset = Subset(train_dataset, indices)
+
+    # train_loader = DataLoader(
+    #     subset,
+    #     batch_size=batch_size,
+    #     shuffle=True,
+    #     num_workers=0,
+    #     pin_memory=torch.cuda.is_available(),
+    # )
+
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -603,6 +621,8 @@ def train_coda_ddm_sft(
 
         optimizer.zero_grad(set_to_none=True)
 
+        sensitivity_tracking = {}
+
         for batch_idx, batch in enumerate(progress):
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
@@ -641,16 +661,39 @@ def train_coda_ddm_sft(
 
             # Unpack (logits, loss) or HuggingFace ModelOutput
             if isinstance(outputs, tuple):
-                logits, loss = outputs[0], outputs[1]
+                logits, loss, sens = outputs[0], outputs[1], outputs[2]
             else:
                 logits = getattr(outputs, "logits", None)
                 loss = getattr(outputs, "loss", None)
+                sens = {}
 
             if loss is None:
                 raise RuntimeError(
                     "CoDA forward did not return a loss. "
                     "Make sure you're calling it in training mode with labels."
                 )
+
+            # print(sens)
+            # print(type(sens))
+            # print(type(sensitivity_tracking))
+            if sensitivity_tracking == {}:
+                # print("blank")
+                for k,v in sens.items():
+                    sensitivity_tracking[k] = v
+            else:
+                # print("bruh")
+                # print(sens)
+                # print(type(sens))
+                for k,v in sens.items():
+                    # print(k,v)
+                    if k not in sensitivity_tracking:
+                        sensitivity_tracking[k] = 0
+                    
+                    # print(type(sensitivity_tracking[k]))
+                    sensitivity_tracking[k] += v
+
+            # print(sensitivity_tracking)
+            # print(type(sensitivity_tracking))
 
             # Gradient accumulation
             loss_to_backprop = loss / gradient_accumulation_steps
@@ -692,10 +735,19 @@ def train_coda_ddm_sft(
                 )
 
         avg_loss = epoch_loss / max(num_batches, 1)
+
+        # print(sensitivity_tracking)
+        avg_sens = {
+            x:(y/max(num_batches,1)) for x,y in sensitivity_tracking.items()
+        }
+
         print(f"\nEpoch {epoch + 1} summary:")
         print(f"  avg loss: {avg_loss:.4f}")
         if avg_loss < 20:
             print(f"  avg ppl:  {math.exp(avg_loss):.2f}")
+        
+        print(f"Sensitivity Results:\n{avg_sens}")
+
 
         if use_wandb:
             wandb.log(
@@ -710,13 +762,13 @@ def train_coda_ddm_sft(
             )
 
         # Save a checkpoint each epoch
-        ckpt_dir = os.path.join(save_dir, f"{task}_epoch_{epoch+1}")
-        print(f"Saving epoch {epoch+1} checkpoint to: {ckpt_dir}")
-        os.makedirs(ckpt_dir, exist_ok=True)
+        # ckpt_dir = os.path.join(save_dir, f"{task}_epoch_{epoch+1}")
+        # print(f"Saving epoch {epoch+1} checkpoint to: {ckpt_dir}")
+        # os.makedirs(ckpt_dir, exist_ok=True)
 
         sanitize_generation_config(model)
-        model.save_pretrained(ckpt_dir, safe_serialization=False)
-        tokenizer.save_pretrained(ckpt_dir)
+        # model.save_pretrained(ckpt_dir, safe_serialization=False)
+        # tokenizer.save_pretrained(ckpt_dir)
 
     print("\n" + "=" * 60)
     print("Training complete!")

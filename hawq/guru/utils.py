@@ -11,10 +11,10 @@ from transformers import AutoTokenizer, AutoModel
 from math import floor
 
 
-MODEL_ID = "Salesforce/CoDA-v0-Instruct"
+# MODEL_ID = "Salesforce/CoDA-v0-Instruct"
 
 
-def load_coda_model():
+def load_coda_model(MODEL_ID):
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
 
     model = AutoModel.from_pretrained(

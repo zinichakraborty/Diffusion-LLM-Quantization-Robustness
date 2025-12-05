@@ -561,4 +561,166 @@ class CoDALanguageModel(DLMGenerationMixin, PreTrainedModel):
         loss = (dsigma[:, None] * loss).sum() / (
             input_ids.shape[0] * input_ids.shape[1]
         )
-        return logits, loss
+
+        # hacking for sysML - always compute sens, have n=100
+        n_power = 100
+
+        sens = {}
+
+        # sens = self.compute_layer_sensitivity(
+        #     noisy_input_ids=noisy_input_ids,
+        #     target_ids=target_ids,
+        #     loss_mask=loss_mask,
+        #     dsigma=dsigma,
+        #     attention_mask=attention_mask,
+        #     num_power_iterations=n_power,
+        # )
+        # print(sens)
+        return logits, loss, sens
+
+
+    def compute_layer_sensitivity(
+        self,
+        noisy_input_ids: torch.LongTensor,
+        target_ids: torch.LongTensor,
+        loss_mask: torch.BoolTensor,
+        dsigma: torch.Tensor,
+        attention_mask: torch.FloatTensor | None = None,
+        num_power_iterations: int = 5,
+        epsilon: float = 1e-4,
+        sample_ratio: float = 0.1,  # Only use 10% of params per layer
+        use_forward_diff: bool = True,  # Forward diff vs central diff
+    ):
+        """
+        Compute sensitivity with aggressive optimizations:
+        1. Forward difference (1 forward pass vs 2)
+        2. Parameter sampling (only perturb subset of params)
+        3. Reduced iterations (5 vs 10+)
+        4. Mixed precision
+        5. Gradient accumulation disabled
+        """
+        loss_func = nn.CrossEntropyLoss(reduction="none")
+        batch_size, seq_len = noisy_input_ids.shape
+        scale = 1.0 / (batch_size * seq_len)
+        
+        target_flat = target_ids.view(-1)
+        
+        # Cache base loss and gradients
+        def compute_loss_and_grads(params):
+            with torch.amp.autocast('cuda', enabled=True):
+                hidden_states = self.model(input_ids=noisy_input_ids, attention_mask=attention_mask)
+                logits = self.lm_head(hidden_states)[..., :-1, :].contiguous()
+            
+            logits = logits.float()
+            loss = loss_func(logits.view(-1, logits.size(-1)), target_flat)
+            loss = loss.view(batch_size, -1).masked_fill(~loss_mask, 0)
+            loss = (dsigma[:, None] * loss).sum() * scale
+            
+            grads = torch.autograd.grad(loss, params)
+            return loss, grads
+        
+        # Build module -> params mapping
+        module_params = {}
+        for name, param in self.named_parameters():
+            if not param.requires_grad:
+                continue
+            parts = name.split('.')
+            if 'layers' in parts:
+                idx = parts.index('layers')
+                module_name = '.'.join(parts[:idx + 2])
+            else:
+                module_name = '.'.join(parts[:2]) if len(parts) > 1 else parts[0]
+            
+            if module_name not in module_params:
+                module_params[module_name] = []
+            module_params[module_name].append(param)
+        
+        sensitivities = {}
+        
+        for module_name, params in module_params.items():
+            # Parameter sampling: create sparse perturbation masks
+            vs = []
+            for p in params:
+                v = torch.zeros_like(p.data)
+                # Random sparse mask
+                mask = torch.rand_like(p.data) < sample_ratio
+                v[mask] = torch.randn(mask.sum(), device=p.device, dtype=p.dtype)
+                vs.append(v)
+            
+            # Joint normalization
+            norm_sq = sum(v.pow(2).sum() for v in vs)
+            if norm_sq < 1e-10:
+                sensitivities[module_name] = 0.0
+                continue
+            
+            inv_norm = torch.rsqrt(norm_sq)
+            for v in vs:
+                v.mul_(inv_norm)
+            
+            # Compute base gradient once (for forward diff)
+            if use_forward_diff:
+                _, grads_base = compute_loss_and_grads(params)
+            
+            Hv_norm = 0.0
+            
+            for iteration in range(num_power_iterations):
+                # Perturb: w + εv
+                with torch.no_grad():
+                    for param, v in zip(params, vs):
+                        param.data.add_(v, alpha=epsilon)
+                
+                _, grads_plus = compute_loss_and_grads(params)
+                
+                if use_forward_diff:
+                    # Forward difference: Hv ≈ (g+ - g_base) / ε
+                    with torch.no_grad():
+                        for param, v in zip(params, vs):
+                            param.data.add_(v, alpha=-epsilon)
+                    
+                    inv_eps = 1.0 / epsilon
+                    norm_sq = 0.0
+                    for i, (gp, gb) in enumerate(zip(grads_plus, grads_base)):
+                        vs[i] = (gp - gb) * inv_eps
+                        norm_sq += vs[i].pow(2).sum()
+                else:
+                    # Central difference: Hv ≈ (g+ - g-) / 2ε
+                    with torch.no_grad():
+                        for param, v in zip(params, vs):
+                            param.data.add_(v, alpha=-2 * epsilon)
+                    
+                    _, grads_minus = compute_loss_and_grads(params)
+                    
+                    with torch.no_grad():
+                        for param, v in zip(params, vs):
+                            param.data.add_(v, alpha=epsilon)
+                    
+                    inv_2eps = 0.5 / epsilon
+                    norm_sq = 0.0
+                    for i, (gp, gm) in enumerate(zip(grads_plus, grads_minus)):
+                        vs[i] = (gp - gm) * inv_2eps
+                        norm_sq += vs[i].pow(2).sum()
+                
+                Hv_norm = torch.sqrt(norm_sq)
+                
+                if Hv_norm > 1e-8:
+                    inv_norm = 1.0 / Hv_norm
+                    for v in vs:
+                        v.mul_(inv_norm)
+                else:
+                    Hv_norm = 0.0
+                    break
+                
+                # Early stopping if converged
+                if iteration > 0 and abs(Hv_norm.item() - prev_norm) / (prev_norm + 1e-8) < 0.01:
+                    break
+                prev_norm = Hv_norm.item()
+            
+            sensitivities[module_name] = Hv_norm.item() if torch.is_tensor(Hv_norm) else Hv_norm
+        
+        assert sensitivities != {}, f"sens"
+        # print(sensitivities)
+        return sensitivities
+
+# pixi run python main.py --sensitivities /storage/ice1/0/7/agupta965/research2/hawq/guru/coda_sensitivities_from_aarav.json --splits 30/40/30 --save-dir /storage/ice1/0/7/agupta965/checkpoints/coda_hawq
+# nohup pixi run python qat_sft.py --model_name /storage/ice1/0/7/agupta965/checkpoints/coda_hawq --num_epochs 10 --task wikitext2
+# pixi run python main.py --sensitivities /storage/ice1/0/7/agupta965/research2/hawq/guru/coda_sensitivities_from_aarav.json --splits 30/40/30 --save-dir /storage/ice1/0/7/agupta965/checkpoints/coda_hawq --modelname /storage/ice1/0/7/agupta965/checkpoints/coda_hawq

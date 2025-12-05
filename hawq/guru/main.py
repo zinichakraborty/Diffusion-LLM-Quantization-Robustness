@@ -44,6 +44,12 @@ def add_arguments(parser):
         default=128,
         help="Per-group size for symmetric weight quantization (GPTQ-style)",
     )
+    parser.add_argument(
+        "--modelname",
+        type=str,
+        default="Salesforce/CoDA-v0-Instruct",
+        help="HuggingFace model name or local CoDA checkpoint path",
+    )
 
 
 def main(args):
@@ -51,7 +57,7 @@ def main(args):
     sensitivities = load_sensitivities_json(Path(args.sensitivities))
     bit_assignments = calculate_bit_assignments_per_block(sensitivities, splits)
 
-    coda_model, tokenizer = load_coda_model()
+    coda_model, tokenizer = load_coda_model(args.modelname)
 
     quantize_model(
         coda_model,
