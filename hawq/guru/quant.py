@@ -42,41 +42,38 @@ def quantize_tensor_per_group_symmetric(
       bits in {2,3,4,8}, group_size=128, sym=True
     """
     if num_bits >= 16:
-        # 16-bit = "no quantization" in this script
         return tensor
-
     if num_bits not in (2, 3, 4, 8):
-        raise ValueError(f"Unsupported num_bits={num_bits}. Expected 2,3,4,8, or >=16.")
+        raise ValueError
 
-    qmax = 2 ** (num_bits - 1) - 1  # signed symmetric range [-qmax, qmax]
-    orig_shape = tensor.shape
-    last_dim = orig_shape[-1]
+    qmax = 2 ** (num_bits - 1) - 1
+    if tensor.ndim != 2:
+        raise ValueError("Expected 2D weight for Linear")
 
-    # Flatten everything but the last dim
-    tensor_2d = tensor.view(-1, last_dim)
+    out_features, in_features = tensor.shape
+    n_groups = (in_features + group_size - 1) // group_size
+
+    tensor_2d = tensor
     quantized = torch.empty_like(tensor_2d)
-
-    n_groups = (last_dim + group_size - 1) // group_size
 
     for g in range(n_groups):
         start = g * group_size
-        end = min((g + 1) * group_size, last_dim)
+        end = min((g + 1) * group_size, in_features)
 
-        group_slice = tensor_2d[:, start:end]
-        max_val = group_slice.abs().max()
+        group_slice = tensor_2d[:, start:end]  # [out_features, group_width]
 
-        if max_val == 0:
-            # All zeros => nothing to quantize
-            scale = torch.tensor(1.0, dtype=tensor.dtype, device=tensor.device)
-            group_q = group_slice  # stays zero
-        else:
-            scale = max_val / qmax
-            group_int = torch.round(group_slice / scale).clamp(-qmax, qmax)
-            group_q = group_int * scale
+        # per-row max for this group
+        max_val = group_slice.abs().amax(dim=-1, keepdim=True)  # [out_features, 1]
+        # Avoid division by zero
+        scale = max_val / qmax
+        scale[scale == 0] = 1.0
+
+        group_int = torch.round(group_slice / scale).clamp(-qmax, qmax)
+        group_q = group_int * scale
 
         quantized[:, start:end] = group_q
 
-    return quantized.view(orig_shape)
+    return quantized
 
 
 def quantize_linear_layer(

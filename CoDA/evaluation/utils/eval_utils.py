@@ -1,5 +1,5 @@
 # Eval configurations
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 
 # SBATCH configurations
 JOB_NAME_TEMPLATE = "Task_{evaluation_set}_evaluation_on_{model}"
