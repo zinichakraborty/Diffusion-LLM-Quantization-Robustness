@@ -272,3 +272,6 @@ logs
 **/gptq_quantized_models/*
 **/checkpoints_coda/*
 mp_results/
+old_results/
+old_logs
+results/
