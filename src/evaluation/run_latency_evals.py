@@ -16,27 +16,23 @@ def parse_args():
         "--models-dir",
         type=str,
         required=True,
-        help="Directory containing GPTQ model subdirectories (e.g., gptq_experiments/gptq_quantized_models)",
     )
     parser.add_argument(
         "--num-runs",
         type=int,
         default=100,
-        help="Number of forward passes to measure for latency",
     )
     parser.add_argument(
         "--warmup-runs",
         type=int,
         default=10,
-        help="Number of warmup runs before measuring latency",
     )
     return parser.parse_args()
 
 def find_model_directories(models_dir: Path):
-    """Find all subdirectories containing model.safetensors"""
     models_dir = Path(models_dir)
     if not models_dir.exists():
-        raise FileNotFoundError(f"Models directory {models_dir} does not exist")
+        raise FileNotFoundError()
     
     model_dirs = []
     for subdir in models_dir.iterdir():
@@ -44,24 +40,18 @@ def find_model_directories(models_dir: Path):
             model_dirs.append(subdir)
     
     if not model_dirs:
-        raise ValueError(
-            f"No model directories with model.safetensors found in {models_dir}"
-        )
+        raise ValueError()
     
     return sorted(model_dirs)
 
 def safe_model_name(model_path: Path):
-    """Convert model path to safe name for job naming"""
     return str(model_path.name).replace("/", "__")
 
 def submit_job(script, job_name, log_output):
-    """Submit a SLURM job"""
     desc = pyslurm.JobSubmitDescription(
         name=job_name,
         time_limit=TIME,
         nodes=1,
-        # memory_per_node=MEM,
-        # gres_per_node=GRES_GPU,
         gpus=1,
         standard_output=log_output,
         standard_error=log_output,
@@ -72,13 +62,12 @@ def submit_job(script, job_name, log_output):
     return job_id
 
 def create_jobs(models_dir: Path, num_runs: int, warmup_runs: int):
-    """Create SLURM jobs for all models in the directory"""
     model_dirs = find_model_directories(models_dir)
+    model_dirs = [d for d in model_dirs if "CoDA" in d.name]
     job_ids = []
     
     for model_dir in model_dirs:
         safe_name = safe_model_name(model_dir)
-        # Use absolute path for model directory
         model_dir_abs = model_dir.resolve()
         script = SCRIPT_TEMPLATE.format(
             model_dir=str(model_dir_abs),
@@ -100,9 +89,6 @@ def create_jobs(models_dir: Path, num_runs: int, warmup_runs: int):
 def main():
     args = parse_args()
     models_dir = Path(args.models_dir)
-    
-    print(f"Looking for GPTQ models in {models_dir}")
-    print("Results will be saved in each model's directory as latency_result.json")
     
     create_jobs(models_dir, args.num_runs, args.warmup_runs)
     

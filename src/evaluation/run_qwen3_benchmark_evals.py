@@ -92,6 +92,7 @@ def submit_job(script: str, job_name: str, log_output: str, script_dir: Path):
 
 def create_jobs(models_dir: Path, results_root: Path):
     model_dirs = find_model_directories(models_dir)
+    model_dirs = [d for d in model_dirs if "Qwen3" in d.name]
     all_job_ids = []
 
     for model_dir in model_dirs:

@@ -10,20 +10,16 @@ def sanitize_generation_config(model):
         return
     gc = model.generation_config
 
-    # If sampling is off, unset temperature (or just set a sane default).
     if getattr(gc, "do_sample", False) is False and getattr(gc, "temperature", None) in (0, 0.0):
         try:
-            # Best: unset so it won't be serialized
             gc.temperature = None
         except Exception:
-            # Fallback: set to a standard default
             gc.temperature = 1.0
 
-    # Make sure it validates; if it still complains, fall back to a clean config.
     try:
         gc.validate()
     except Exception:
-        model.generation_config = GenerationConfig()  # minimal, valid config
+        model.generation_config = GenerationConfig()
 
 def quantize_tensor_per_group_symmetric(
     tensor: torch.Tensor,
@@ -50,11 +46,9 @@ def quantize_tensor_per_group_symmetric(
         start = g * group_size
         end = min((g + 1) * group_size, in_features)
 
-        group_slice = tensor_2d[:, start:end]  # [out_features, group_width]
+        group_slice = tensor_2d[:, start:end]
 
-        # per-row max for this group
-        max_val = group_slice.abs().amax(dim=-1, keepdim=True)  # [out_features, 1]
-        # Avoid division by zero
+        max_val = group_slice.abs().amax(dim=-1, keepdim=True)
         scale = max_val / qmax
         scale[scale == 0] = 1.0
 
@@ -72,13 +66,12 @@ def quantize_linear_layer(
     group_size: int = 128,
 ):
     if num_bits >= 16:
-        return  # keep fp16 as-is
+        return
 
     with torch.no_grad():
         w = linear.weight.data
         qw = quantize_tensor_per_group_symmetric(w, num_bits=num_bits, group_size=group_size)
         linear.weight.data.copy_(qw)
-        # GPTQ-style quantization is weight-only; keep bias in full precision.
 
 
 def quantize_block(
@@ -93,32 +86,25 @@ def quantize_block(
         if isinstance(submodule, nn.Linear):
             quantize_linear_layer(submodule, num_bits=num_bits, group_size=group_size)
 
-
-# -----------------------
-# Public API: quantize + save
-# -----------------------
-
 def quantize_model(
     model: nn.Module,
     bit_assignments: Dict[str, int],
     group_size: int = 128,
 ):
     
-    # Sanity check
     supported_bits = {4, 8, 16}
     for name, bits in bit_assignments.items():
         if bits not in supported_bits:
-            raise ValueError(f"Unsupported bitwidth {bits} for layer {name}")
+            raise ValueError()
 
-    # Walk all modules and quantize those whose name appears in bit_assignments
     for module_name, module in model.named_modules():
         if module_name in bit_assignments:
             bits = bit_assignments[module_name]
             if bits < 16:
-                print(f"[quantize_model] Quantizing {module_name} to {bits}-bit (group_size={group_size})")
+                print(f"Quantizing {module_name} to {bits}-bit (group_size={group_size})")
                 quantize_block(module, num_bits=bits, group_size=group_size)
             else:
-                print(f"[quantize_model] Keeping {module_name} in 16-bit precision")
+                print(f"Keeping {module_name} in 16-bit precision")
 
     return model
 
@@ -133,12 +119,10 @@ def save_model(
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    # Save the model weights (and config) in HF format.
     sanitize_generation_config(model)
     model.save_pretrained(save_dir, safe_serialization=True)
     tokenizer.save_pretrained(save_dir)
 
-    # Save quantization metadata for reproducibility.
     meta = {
         "quantization_method": "per-group-symmetric-simulated",
         "group_size": group_size,

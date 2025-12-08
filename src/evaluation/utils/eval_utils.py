@@ -1,7 +1,5 @@
-# Eval configurations
 BATCH_SIZE = 8
 
-# SBATCH configurations
 JOB_NAME_TEMPLATE = "Task_{evaluation_set}_evaluation_on_{model}"
 NODES = 1
 MEM = "500G"
@@ -10,7 +8,6 @@ TIME = "5:00:00"
 LOG_FILE_PATH_TEMPLATE = "./logs/{evaluation_set}_evaluation_on_{model}.out"
 MAIL_TYPE = "BEGIN,END,FAIL"
 
-# Script template for each evaluation set
 SCRIPT_TEMPLATE = """#!/bin/bash
 module load uv
 

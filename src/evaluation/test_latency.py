@@ -11,8 +11,6 @@ from transformers import AutoModel, AutoConfig
 from accelerate import init_empty_weights
 from optimum.gptq import load_quantized_model
 
-# ---- args ----
-
 def parse_args():
     p = argparse.ArgumentParser()
     p.add_argument("--mode", choices=["base", "gptq"], default="base")
@@ -41,54 +39,35 @@ def _gpu_cc():
     return torch.cuda.get_device_capability()
 
 def _force_safe_sdpa_on_pre_ampere():
-    """
-    Make sure a kernel exists on sm<80:
-      - disable flash
-      - disable mem_efficient (optional; set False to be strict)
-      - enable math
-    Apply both NEW and OLD APIs, and actually enter the new context manager globally.
-    """
     maj, _ = _gpu_cc()
     if maj >= 8 or not torch.cuda.is_available():
         return
 
-    # Try new API first (PyTorch 2.4+)
     try:
         from torch.nn.attention import sdpa_kernel
-        # Enter context permanently (until process exit)
         _GLOBAL_SDPA_CTX = sdpa_kernel(enable_flash=False, enable_mem_efficient=False, enable_math=True)
         _GLOBAL_SDPA_CTX.__enter__()
-        print("[SDPA] Enabled math kernel (new API), disabled flash/mem_efficient for sm<80.")
     except Exception:
         pass
 
-    # Also call legacy toggles to be safe
     try:
         torch.backends.cuda.enable_flash_sdp(False)
         torch.backends.cuda.enable_mem_efficient_sdp(False)
         torch.backends.cuda.enable_math_sdp(True)
-        print("[SDPA] Enabled math kernel (legacy API), disabled flash/mem_efficient for sm<80.")
     except Exception:
         pass
 
 def _pick_dtype_for_device(requested_dtype: torch.dtype) -> torch.dtype:
     maj, _ = _gpu_cc()
     if maj < 8 and requested_dtype == torch.bfloat16:
-        print("[Note] sm<80 detected; overriding bfloat16 -> float16 for better kernel coverage.")
         return torch.float16
     return requested_dtype
 
 def _coerce_attn_impl(attn_impl: str) -> str:
     maj, _ = _gpu_cc()
     if maj < 8 and attn_impl in ("flash_attention_2", "auto"):
-        print("[Note] sm<80 detected; coercing attn_implementation -> 'sdpa'.")
         return "sdpa"
     return attn_impl
-    # if mask.dtype == torch.bool:
-    #     add = torch.zeros_like(mask, dtype=target_dtype)
-    #     add = add.masked_fill(~mask, float("-inf"))
-    #     return add
-    # return mask.to(target_dtype)
 
 def load_base_model(args, torch_dtype, attn_impl):
     cfg = None
@@ -119,7 +98,7 @@ def load_base_model(args, torch_dtype, attn_impl):
 
 def load_gptq_model(args, torch_dtype, attn_impl):
     if args.gptq_model_dir is None:
-        raise ValueError("--gptq-model-dir is required when --mode gptq")
+        raise ValueError()
 
     gptq_dir = Path(args.gptq_model_dir)
 
@@ -139,7 +118,7 @@ def load_gptq_model(args, torch_dtype, attn_impl):
     model = load_quantized_model(
         empty,
         save_folder=str(gptq_dir),
-        device_map=args.device,       # or "auto", but then use it for base too
+        device_map=args.device,
     )
     return model
 
@@ -148,7 +127,6 @@ def measure_latency(model, num_runs: int = 100, warmup_runs: int = 10, seq_lengt
     input_ids = torch.randint(0, 1000, (batch_size, seq_length), device=device)
     attention_mask = torch.ones_like(input_ids)
 
-    print(f"Running {warmup_runs} warmup iterations...")
     with torch.inference_mode():
         for _ in range(warmup_runs):
             try:
@@ -159,7 +137,6 @@ def measure_latency(model, num_runs: int = 100, warmup_runs: int = 10, seq_lengt
     if device.type == "cuda":
         torch.cuda.synchronize()
 
-    print(f"Measuring latency over {num_runs} iterations...")
     latencies: List[float] = []
     with torch.inference_mode():
         for i in range(num_runs):
@@ -179,34 +156,28 @@ def measure_latency(model, num_runs: int = 100, warmup_runs: int = 10, seq_lengt
     return latencies
 
 def test_generation(model, model_name: str):
-    print("\n===== Testing Generation =====")
     device = next(model.parameters()).device
     input_ids = torch.randint(0, 1000, (1, 32), device=device)
     if hasattr(model, "diffusion_generate"):
-        print("===== generating with diffusion_generate =====")
         try:
             y = model.diffusion_generate(input_ids, num_steps=4, max_length=256)
-            print("Generated sequence shape:", tuple(y.shape))
         except Exception as e:
-            print("Error in diffusion_generate:", e)
+            print(e)
     elif hasattr(model, "sample"):
-        print("===== generating with model sample =====")
         try:
             y = model.sample(input_ids, steps=128, max_tokens=256)
-            print("Generated sequence shape:", tuple(y.shape))
         except Exception as e:
-            print("Error in sample:", e)
+            print(e)
     else:
-        print("===== Model methods:", [m for m in dir(model) if not m.startswith("_")])
+        print("Model methods:", [m for m in dir(model) if not m.startswith("_")])
 
 
 def main():
     args = parse_args()
 
-    # dtype & backend (shared)
     req_dtype = get_torch_dtype(args.torch_dtype)
     _force_safe_sdpa_on_pre_ampere()
-    torch_dtype = _pick_dtype_for_device(req_dtype)  # from your base script
+    torch_dtype = _pick_dtype_for_device(req_dtype)
     attn_impl = _coerce_attn_impl(args.attn_impl)
 
     if torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8:
@@ -223,8 +194,6 @@ def main():
 
     model.eval()
 
-    # latency
-    print("\n===== Latency Testing =====")
     L = measure_latency(
         model,
         num_runs=args.num_runs,
@@ -233,7 +202,7 @@ def main():
         batch_size=args.batch_size,
     )
 
-    print("\n===== Latency Results =====")
+    print("\nLatency Results")
     print(f"  Mean: {statistics.mean(L):.2f} ms")
     print(f"  Std:  {statistics.stdev(L) if len(L) > 1 else 0.0:.2f} ms")
     print(f"  Min:  {min(L):.2f} ms")
