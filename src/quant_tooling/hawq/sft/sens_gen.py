@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import os
 import sys
 import argparse
@@ -24,16 +23,14 @@ except ImportError:
 
 def fake_quantize_symmetric(x, num_bits=8, eps: float = 1e-8):
     if num_bits <= 1:
-        return x  # degenerate, just bail
+        return x
 
-    qmax = 2 ** (num_bits - 1) - 1  # e.g. 127
-    # Use absolute max for symmetric quant
+    qmax = 2 ** (num_bits - 1) - 1
     max_val = x.detach().abs().max()
     if max_val < eps:
         return x
 
     scale = max_val / qmax
-    # Round to nearest integer and clamp to range
     x_int = torch.clamp(torch.round(x / scale), -qmax - 1, qmax)
     x_q = x_int * scale
     return x_q
@@ -44,25 +41,22 @@ class QuantLinear(nn.Module):
     def __init__(self, linear: nn.Linear, num_bits: int = 8, quantize_activations: bool = True):
         super().__init__()
         if not isinstance(linear, nn.Linear):
-            raise TypeError("QuantLinear expects an nn.Linear module")
+            raise TypeError()
 
         self.linear = linear
         self.num_bits = num_bits
         self.quantize_activations = quantize_activations
-        self.qat_enabled = True  # can be toggled at runtime
+        self.qat_enabled = True
 
     def forward(self, x):
         if self.qat_enabled:
-            # fake-quant activations if requested
             if self.quantize_activations:
                 x = fake_quantize_symmetric(x, num_bits=self.num_bits)
 
-            # fake-quant weights
             w = fake_quantize_symmetric(self.linear.weight, num_bits=self.num_bits)
             b = self.linear.bias
             return F.linear(x, w, b)
         else:
-            # fall back to normal float forward
             return self.linear(x)
 
 
@@ -86,20 +80,16 @@ def sanitize_generation_config(model):
 
     gc = model.generation_config
 
-    # If sampling is off but temperature is 0.0, unset or fix it.
     if getattr(gc, "do_sample", False) is False and getattr(gc, "temperature", None) in (0, 0.0):
         try:
-            # Prefer to unset so it isn't serialized
             gc.temperature = None
         except Exception:
-            # Fallback: a sane default
             gc.temperature = 1.0
 
-    # Make sure it validates; if not, fall back to a clean config.
     try:
         gc.validate()
     except Exception:
-        model.generation_config = GenerationConfig()  # minimal, valid config
+        model.generation_config = GenerationConfig()
 
 
 def load_coda_model_from_local(model_name, model_kwargs, script_dir=None):
@@ -196,11 +186,9 @@ class GSMDataset(Dataset):
             q = item["question"]
             a = item["answer"]
 
-            # Text formatting
             prompt_text = f"Question: {q}\nAnswer:"
             answer_text = f" {a}"
 
-            # First encode full prompt+answer
             full_enc = tokenizer(
                 prompt_text + answer_text,
                 max_length=self.max_length,
@@ -211,7 +199,6 @@ class GSMDataset(Dataset):
             input_ids = full_enc["input_ids"].squeeze(0)
             attention_mask = full_enc["attention_mask"].squeeze(0)
 
-            # Encode prompt alone to determine prompt length in tokens
             prompt_enc = tokenizer(
                 prompt_text,
                 max_length=self.max_length,
@@ -222,14 +209,12 @@ class GSMDataset(Dataset):
             prompt_ids = prompt_enc["input_ids"].squeeze(0)
             pad_id = tokenizer.pad_token_id
             if pad_id is None:
-                # Fallback: count all tokens (rare for GPT-style)
                 prompt_len = (prompt_ids != -100).sum().item()
             else:
                 prompt_len = (prompt_ids != pad_id).sum().item()
 
             src_mask = torch.zeros_like(input_ids, dtype=torch.bool)
             src_mask[:prompt_len] = True
-            # Also never treat pads as source
             if pad_id is not None:
                 src_mask[input_ids == pad_id] = False
 
@@ -265,14 +250,13 @@ class WikiText2Dataset(Dataset):
 
         joined = "\n\n".join(texts)
 
-        # Tokenize as one long stream, then chunk
         enc = tokenizer(
             joined,
             return_tensors="pt",
             truncation=False,
             add_special_tokens=False,
         )
-        full_ids = enc["input_ids"].squeeze(0)  # (T,)
+        full_ids = enc["input_ids"].squeeze(0)
         num_tokens = full_ids.size(0)
 
         num_blocks = num_tokens // max_length
@@ -300,7 +284,6 @@ class WikiText2Dataset(Dataset):
         return {
             "input_ids": self.input_ids[idx],
             "attention_mask": self.attention_mask[idx],
-            # No src_mask needed for pretraining (we'll pass src_mask=None)
         }
 
 
@@ -319,7 +302,7 @@ def load_coda_or_auto(model_name, model_kwargs):
 
 def train_coda_ddm_sft(
     model_name="Salesforce/CoDA-v0-Instruct",
-    task="gsm8k",                # "gsm8k" or "wikitext2"
+    task="gsm8k",
     dataset_split="train",
     batch_size=4,
     num_epochs=3,
@@ -393,7 +376,6 @@ def train_coda_ddm_sft(
             "found mask_token_id=None. Make sure you're using a CoDA checkpoint."
         )
 
-    # Ensure we have padding; for decoder-only models we often set pad=eos
     if tokenizer.pad_token_id is None:
         if tokenizer.eos_token_id is not None:
             tokenizer.pad_token = tokenizer.eos_token
@@ -422,11 +404,9 @@ def train_coda_ddm_sft(
 
     sanitize_generation_config(model)
 
-    # Optionally wrap all Linear layers with QAT
     if use_qat:
         print(f"\n[QAT] Wrapping Linear layers with QuantLinear (bits={qat_bits})...")
         wrap_linear_with_qat(model, num_bits=qat_bits, quantize_activations=True)
-        # Start with QAT disabled if warmup > 0
         if qat_warmup_steps > 0:
             set_qat_enabled(model, enabled=False)
             print(f"[QAT] Will enable QAT after {qat_warmup_steps} steps.")
@@ -434,7 +414,6 @@ def train_coda_ddm_sft(
             set_qat_enabled(model, enabled=True)
             print("[QAT] QAT enabled from step 0.")
 
-    # Try to enable gradient checkpointing if available
     if hasattr(model, "gradient_checkpointing_enable"):
         try:
             model.gradient_checkpointing_enable()
@@ -442,7 +421,6 @@ def train_coda_ddm_sft(
         except Exception as e:
             print(f"Could not enable gradient checkpointing: {e}")
 
-    # Parameter counts
     total_params = sum(p.numel() for p in model.parameters())
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"\nModel parameters:")
@@ -465,9 +443,6 @@ def train_coda_ddm_sft(
     else:
         raise ValueError(f"Unknown task '{task}'. Supported: 'gsm8k', 'wikitext2'.")
 
-
-    # randomly select 5% of dataset as representative subset
-    # to avoid issues with high latency of hessian computation
     fraction = 0.05
     num_samples = int(len(train_dataset) * fraction)
 
@@ -481,14 +456,6 @@ def train_coda_ddm_sft(
         num_workers=0,
         pin_memory=torch.cuda.is_available(),
     )
-
-    # train_loader = DataLoader(
-    #     train_dataset,
-    #     batch_size=batch_size,
-    #     shuffle=True,
-    #     num_workers=0,
-    #     pin_memory=torch.cuda.is_available(),
-    # )
 
     print(f"Batches per epoch: {len(train_loader)}")
 
@@ -533,15 +500,12 @@ def train_coda_ddm_sft(
             attention_mask = batch["attention_mask"].to(device)
 
             if task == "gsm8k":
-                # Supervised fine-tuning with prefix src_mask
                 src_mask = batch["src_mask"].to(device)
                 training_mode = "sft"
             else:
-                # WikiText-2 pretraining: no src_mask, use default pretrain behavior
                 src_mask = None
                 training_mode = "pretrain"
 
-            # Enable QAT after warmup if configured
             if use_qat and qat_warmup_steps > 0 and global_step == qat_warmup_steps:
                 print(f"[QAT] Enabling QAT at global_step={global_step}")
                 set_qat_enabled(model, enabled=True)
@@ -557,7 +521,6 @@ def train_coda_ddm_sft(
                     calc_sens=True
                 )
             except TypeError:
-                # Fallback if CoDA doesn't take training_mode/epoch/etc.
                 outputs = model(
                     input_ids=input_ids,
                     attention_mask=attention_mask,
@@ -565,7 +528,6 @@ def train_coda_ddm_sft(
                     labels=input_ids,
                 )
 
-            # Unpack (logits, loss) or HuggingFace ModelOutput
             if isinstance(outputs, tuple):
                 logits, loss, sens = outputs[0], outputs[1], outputs[2]
             else:

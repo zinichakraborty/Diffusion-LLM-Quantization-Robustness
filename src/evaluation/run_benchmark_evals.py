@@ -19,13 +19,10 @@ def create_results_dir(results_dir):
 
 def check_model(model):
     if not Path(model).exists() and not model.startswith("Salesforce/"):
-        raise FileNotFoundError(f"Model path {model} does not exist or is not a Salesforce model")
+        raise FileNotFoundError()
 
 
 def submit_job(script: str, job_name: str, log_output: str):
-    """
-    Submit a job to Slurm using `sbatch`, passing the job script via stdin.
-    """
     cmd = [
         "sbatch",
         f"--job-name={job_name}",
@@ -47,15 +44,11 @@ def submit_job(script: str, job_name: str, log_output: str):
             check=True,
         )
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            f"sbatch failed for job {job_name} with exit code {e.returncode}:\n"
-            f"STDOUT:\n{e.stdout}\nSTDERR:\n{e.stderr}"
-        )
+        raise RuntimeError()
 
-    # Typical sbatch output: "Submitted batch job 12345"
     stdout = result.stdout.strip()
     if not stdout:
-        raise RuntimeError(f"sbatch did not return a job ID for job {job_name}")
+        raise RuntimeError()
 
     job_id = stdout.split()[-1]
     return job_id
