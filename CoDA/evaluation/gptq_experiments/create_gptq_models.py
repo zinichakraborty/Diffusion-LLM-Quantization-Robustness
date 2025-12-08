@@ -1,6 +1,3 @@
-# quantize_coda_and_qwen3_gptq.py
-# pip install --upgrade "optimum>=1.21.0" transformers datasets safetensors
-
 import os
 import torch
 from transformers import AutoModel, AutoTokenizer, GenerationConfig
@@ -13,7 +10,7 @@ CODA_ID = "Salesforce/CoDA-v0-Instruct"
 QWEN3_ID = "Qwen/Qwen3-1.7B"
 
 CALIBRATION_DATASET = "wikitext2"
-RESULTS_DIR = "gptq_quantized_models_4"
+RESULTS_DIR = "gptq_quantized_models"
 
 
 def safe_name(hub_id: str) -> str:
@@ -66,12 +63,33 @@ def _coda_post_hook(module, args, output):
     return output
 
 
-def attach_coda_hooks(coda_model):
+def attach_coda_hooks(m):
+    """
+    Attach [T,H] -> [1,T,H] pre-hook and matching post-hook to each decoder block.
+    Works for:
+      - CoDA-style models with m.model.layers
+      - Qwen3-style models with m.layers
+    """
     handles = []
-    for block in coda_model.model.layers:
+
+    # CoDA-style: model.model.layers
+    if hasattr(m, "model") and hasattr(m.model, "layers"):
+        blocks = m.model.layers
+    # Qwen3-style: model.layers
+    elif hasattr(m, "layers"):
+        blocks = m.layers
+    else:
+        raise AttributeError(
+            f"Don't know how to find decoder layers on {type(m)}; "
+            "expected m.model.layers or m.layers."
+        )
+
+    for block in blocks:
         handles.append(block.register_forward_pre_hook(_coda_pre_hook, with_kwargs=True))
         handles.append(block.register_forward_hook(_coda_post_hook))
+
     return handles
+
 
 
 def sanitize_generation_config(model):
@@ -109,7 +127,8 @@ def quantize_model(model_id: str, bits: int, dataset: str, device="cuda", use_co
         model_id,
         trust_remote_code=True,
         device_map=device,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
+        attn_implementation="eager",
     )
 
     # Attach temporary hooks ONLY for CoDA
@@ -145,21 +164,29 @@ def quantize_model(model_id: str, bits: int, dataset: str, device="cuda", use_co
     )
 
     print(f"Saved {model_id}-{bits}bit-{dataset} -> {out_dir}")
+
+    del quantizer
+    del base
+    del tok
+    if device == "cuda" or device == "auto":
+        torch.cuda.empty_cache()
+    
     return out_dir
 
 
 if __name__ == "__main__":
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
+    # CoDA (if/when you want it)
     # for b in BITS:
     #     print("--------------------------------")
     #     print(f"Quantizing CoDA {CODA_ID} at {b} bits…")
     #     quantize_model(CODA_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=True)
     #     print("--------------------------------")
 
+    # Qwen3 ALSO needs the packed-[T,H] hooks during GPTQ calibration
     for b in BITS:
         print("--------------------------------")
         print(f"Quantizing Qwen3 {QWEN3_ID} at {b} bits…")
-        # Qwen3 uses standard HF transformer layout; no CoDA hooks needed
-        quantize_model(QWEN3_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=False)
+        quantize_model(QWEN3_ID, b, CALIBRATION_DATASET, device="cuda", use_coda_hooks=True)
         print("--------------------------------")
