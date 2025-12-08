@@ -30,17 +30,7 @@ def quantize_tensor_per_group_symmetric(
     num_bits: int,
     group_size: int = 128,
 ) -> torch.Tensor:
-    """
-    Per-group symmetric *weight-only* quantization of a tensor.
-
-    - Groups along the last dimension (like GPTQ's group_size on columns).
-    - Symmetric: zero-point = 0, scale = max(|x|) / (2^{bits-1} - 1).
-    - Returns a *dequantized* tensor in the original dtype, i.e., we simulate
-      low-bit weights while keeping a standard fp16/fp32 model for easy use.
-
-    This is intentionally close to GPTQ-style hyperparameters:
-      bits in {2,3,4,8}, group_size=128, sym=True
-    """
+    
     if num_bits >= 16:
         return tensor
     if num_bits not in (2, 3, 4, 8):
@@ -81,10 +71,6 @@ def quantize_linear_layer(
     num_bits: int,
     group_size: int = 128,
 ):
-    """
-    Quantize the weights of a single nn.Linear module in-place
-    using per-group symmetric quantization.
-    """
     if num_bits >= 16:
         return  # keep fp16 as-is
 
@@ -100,12 +86,6 @@ def quantize_block(
     num_bits: int,
     group_size: int = 128,
 ):
-    """
-    Quantize all Linear submodules inside a Transformer block (CoDADecoderLayer).
-
-    This matches GPTQ's true_sequential=True idea at a coarse level:
-    we quantize whole blocks layerwise, using already-quantized predecessors. :contentReference[oaicite:3]{index=3}
-    """
     if num_bits >= 16:
         return
 
@@ -123,17 +103,7 @@ def quantize_model(
     bit_assignments: Dict[str, int],
     group_size: int = 128,
 ):
-    """
-    Apply mixed-precision per-group symmetric quantization:
-
-    - `bit_assignments` maps *module names* (e.g. "model.layers.0") -> bitwidth (4/8/16).
-    - We walk model.named_modules() and for matching names, we quantize the
-      Linear layers in that block.
-
-    Example of keys we're expecting (from CoDA's architecture):
-      - "model.layers.0", "model.layers.1", ..., "model.layers.27"
-    """
-
+    
     # Sanity check
     supported_bits = {4, 8, 16}
     for name, bits in bit_assignments.items():
@@ -160,14 +130,6 @@ def save_model(
     bit_assignments: Dict[str, int],
     group_size: int = 128,
 ):
-    """
-    Save the quantized model:
-
-    - We rely on Hugging Face `save_pretrained` with safe_serialization=True so
-      you get `model.safetensors`.
-    - Also store a small JSON sidecar with the quantization metadata
-      (bit assignments + group size).
-    """
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 

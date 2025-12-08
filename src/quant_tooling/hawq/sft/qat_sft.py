@@ -22,16 +22,7 @@ except ImportError:
     wandb = None
 
 
-# ============================================================================
-# Simple Fake-Quantization Helpers for QAT
-# ============================================================================
 def fake_quantize_symmetric(x, num_bits=8, eps: float = 1e-8):
-    """
-    Symmetric per-tensor fake quantization (no zero-point).
-    Simulates int{num_bits} quantization in float.
-
-    For num_bits=8 -> q in [-127, 127].
-    """
     if num_bits <= 1:
         return x  # degenerate, just bail
 
@@ -49,13 +40,6 @@ def fake_quantize_symmetric(x, num_bits=8, eps: float = 1e-8):
 
 
 class QuantLinear(nn.Module):
-    """
-    Wraps a Linear layer with simple fake-quantization on weights and
-    optionally activations for QAT.
-
-    - Keeps original Linear weights in full precision.
-    - Forwards use quantized copies of weight (and input if enabled).
-    """
 
     def __init__(self, linear: nn.Linear, num_bits: int = 8, quantize_activations: bool = True):
         super().__init__()
@@ -83,9 +67,6 @@ class QuantLinear(nn.Module):
 
 
 def wrap_linear_with_qat(module: nn.Module, num_bits: int = 8, quantize_activations: bool = True):
-    """
-    Recursively replace all nn.Linear submodules with QuantLinear wrappers.
-    """
     for name, child in list(module.named_children()):
         if isinstance(child, nn.Linear):
             setattr(module, name, QuantLinear(child, num_bits, quantize_activations))
@@ -94,21 +75,12 @@ def wrap_linear_with_qat(module: nn.Module, num_bits: int = 8, quantize_activati
 
 
 def set_qat_enabled(model: nn.Module, enabled: bool = True):
-    """
-    Turn QAT on/off globally by toggling qat_enabled flag of QuantLinear modules.
-    """
     for m in model.modules():
         if isinstance(m, QuantLinear):
             m.qat_enabled = enabled
 
 
-# ============================================================================
-# Generation config sanitizer
-# ============================================================================
 def sanitize_generation_config(model):
-    """
-    Fix CoDA's broken GenerationConfig so save_pretrained() stops crashing.
-    """
     if not hasattr(model, "generation_config") or model.generation_config is None:
         return
 
@@ -130,17 +102,7 @@ def sanitize_generation_config(model):
         model.generation_config = GenerationConfig()  # minimal, valid config
 
 
-# ============================================================================
-# CoDA Model Loading Helper (local implementation)
-# ============================================================================
 def load_coda_model_from_local(model_name, model_kwargs, script_dir=None):
-    """
-    Load CoDA model from local CoDALanguageModel directory.
-
-    This expects the CoDA repo folder `CoDALanguageModel` to be in the same
-    directory as this script:
-        https://github.com/SalesforceAIResearch/CoDA/tree/main/CoDALanguageModel
-    """
     if script_dir is None:
         script_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -211,19 +173,7 @@ def load_coda_model_from_local(model_name, model_kwargs, script_dir=None):
         raise
 
 
-# ============================================================================
-# GSM8K Dataset with src_mask for SFT
-# ============================================================================
 class GSMDataset(Dataset):
-    """
-    GSM8K dataset for diffusion SFT.
-
-    We format each example as:
-        "Question: {question}\nAnswer:"  (prompt / source)
-        " {answer}"                       (target / completion)
-
-    src_mask == True on the prompt tokens, False on the answer tokens.
-    """
 
     def __init__(self, tokenizer, split="train", max_length=512):
         self.tokenizer = tokenizer
@@ -291,9 +241,6 @@ class GSMDataset(Dataset):
         return self.examples[idx]
 
 
-# ============================================================================
-# WikiText-2 Dataset (full-token blocks, no src_mask)
-# ============================================================================
 class WikiText2Dataset(Dataset):
     """
     WikiText-2 dataset for diffusion pretraining.
@@ -356,16 +303,7 @@ class WikiText2Dataset(Dataset):
         }
 
 
-# ============================================================================
-# Model loader wrapper
-# ============================================================================
 def load_coda_or_auto(model_name, model_kwargs):
-    """
-    Load CoDA either from local CoDALanguageModel sources (for base HF ID)
-    or from a saved checkpoint directory via AutoModel.
-
-    Here we always assume HF repo ID and try local CoDA implementation first.
-    """
     print(f"Detected remote HF model id: {model_name}")
     try:
         return load_coda_model_from_local(model_name, model_kwargs)
@@ -378,9 +316,6 @@ def load_coda_or_auto(model_name, model_kwargs):
         )
 
 
-# ============================================================================
-# Training Loop for CoDA (GSM8K SFT or WikiText-2 pretrain) + optional QAT
-# ============================================================================
 def train_coda_ddm_sft(
     model_name="Salesforce/CoDA-v0-Instruct",
     task="gsm8k",                # "gsm8k" or "wikitext2"
@@ -398,25 +333,7 @@ def train_coda_ddm_sft(
     qat_bits=8,
     qat_warmup_steps=0,
 ):
-    """
-    Train a CoDA diffusion LM on either GSM8K (SFT) or WikiText-2 (pretraining).
 
-    task == "gsm8k":
-        - Uses GSMDataset.
-        - Calls CoDA with training_mode="sft" and a src_mask.
-
-    task == "wikitext2":
-        - Uses WikiText2Dataset.
-        - Calls CoDA with training_mode="pretrain" and src_mask=None.
-
-    QAT:
-        - If use_qat=True, wraps all nn.Linear layers with QuantLinear.
-        - Fake-quantization is applied during forward passes (after optional warmup).
-    """
-
-    # ------------------------------------------------------------------
-    # Setup
-    # ------------------------------------------------------------------
     os.makedirs(save_dir, exist_ok=True)
 
     if use_wandb:
@@ -445,9 +362,6 @@ def train_coda_ddm_sft(
         print(f"GPU: {torch.cuda.get_device_name(0)}")
         print(f"CUDA version: {torch.version.cuda}")
 
-    # ------------------------------------------------------------------
-    # Tokenizer
-    # ------------------------------------------------------------------
     print(f"\nLoading tokenizer from: {model_name}")
     try:
         tokenizer = AutoTokenizer.from_pretrained(
@@ -492,9 +406,6 @@ def train_coda_ddm_sft(
                 "padding behavior may be odd."
             )
 
-    # ------------------------------------------------------------------
-    # Model (CoDA)
-    # ------------------------------------------------------------------
     model_kwargs = {
         "torch_dtype": torch.bfloat16 if torch.cuda.is_available() else torch.float32,
         "device_map": None,
@@ -537,9 +448,6 @@ def train_coda_ddm_sft(
     print(f"  Total:      {total_params:,}")
     print(f"  Trainable:  {trainable_params:,}")
 
-    # ------------------------------------------------------------------
-    # Dataset & DataLoader
-    # ------------------------------------------------------------------
     print(f"\nLoading dataset for task='{task}'...")
     if task == "gsm8k":
         train_dataset = GSMDataset(
@@ -583,18 +491,12 @@ def train_coda_ddm_sft(
 
     print(f"Batches per epoch: {len(train_loader)}")
 
-    # ------------------------------------------------------------------
-    # Optimizer
-    # ------------------------------------------------------------------
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=learning_rate,
         weight_decay=0.01,
     )
 
-    # ------------------------------------------------------------------
-    # Training Loop
-    # ------------------------------------------------------------------
     global_step = 0
     from tqdm import tqdm
 
@@ -789,9 +691,6 @@ def train_coda_ddm_sft(
     return model
 
 
-# ============================================================================
-# CLI
-# ============================================================================
 def main():
     parser = argparse.ArgumentParser(
         description="CoDA DDM Training (GSM8K SFT or WikiText-2 pretraining) with optional QAT",
