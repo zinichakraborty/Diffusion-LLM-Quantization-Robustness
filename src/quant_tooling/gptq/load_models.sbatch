@@ -1,6 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=quant_qwen
-#SBATCH --gres=gpu:rtx_6000:1
+
+#SBATCH --job-name=quant_qwen_and_coda
+#SBATCH --gres=gpu:l40s:1
 #SBATCH --mem=64G
 #SBATCH --time=6:00:00
 #SBATCH --output=logs/%j.out

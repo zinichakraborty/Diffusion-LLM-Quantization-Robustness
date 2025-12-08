@@ -11,12 +11,10 @@ Research repository for research2.
 
 ## GPTQ
 
-@Guru fill in
+To generate all models (Qwen and CoDA):
 
-To generate all models:
-
-```
-cd src/quant_tooling/gptq/load_models.sbatch
+```sh
+cd src/quant_tooling/gptq
 sbatch load_models.sbatch
 ```
 
@@ -56,4 +54,4 @@ pixi run python run_latency_evals.py --models-dir <local path to gptq/HF saved m
 run python run_qwen3_latency_evals.py --models-dir <local path to all models>
 ```
 
-Used to take in a model, saved locally in the HuggingFace format, and then dispatch SLURM jobs to either benchmark it on the 4 chosen coding benchmarks or run latency evaluation and return the mean latency (alongside the std dev). 
+Used to take in a model, saved locally in the HuggingFace format, and then dispatch SLURM jobs to either benchmark it on the 4 chosen coding benchmarks or run latency evaluation and return the mean latency (alongside the std dev) in a log file saved in `logs/`.
