@@ -1,6 +1,8 @@
 # research2
 Research repository for research2.
 
+We extensively use PACE ICE for our experiments. If this is your first time or you are new to PACE, please follow this [PACE ICE guide](https://github.com/guru-desh/Intro-To-PACE-ICE) made by Guru. These instructions assume that a user's PACE environment is configured according to the guide.
+
 ## Environment Setup
 
 1. Run `salloc --gpus=1 --mem=100G --ntasks-per-node=24`
