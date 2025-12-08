@@ -15,7 +15,7 @@ To test running `LLaDA-8B-Instruct`, run `pixi run poe test_execute_model`
 
 To generate all models (Qwen and CoDA):
 
-```
+```sh
 cd src/quant_tooling/gptq
 sbatch load_models.sbatch
 ```
