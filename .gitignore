@@ -259,3 +259,19 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,python,jupyternotebooks
+
+logs
+# pixi environments
+.pixi/*
+.pixi/config.toml
+
+**/logs/*
+**/*.pt
+**/__pycache__/*
+**/checkpoints/final_model/*
+**/gptq_quantized_models/*
+**/checkpoints_coda/*
+mp_results/
+old_results/
+old_logs
+results/
