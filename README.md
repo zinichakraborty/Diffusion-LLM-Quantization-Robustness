@@ -43,7 +43,7 @@ Used to ingest a HuggingFace (or locally saved HF) model, quantize it to mixed p
 cd src/evaluation
 
 # run benchmark on HumanEval, MBPP benchmarks by dispatching SLURM jobs
-pixi run python run_benchmark_evals.py --model <HF model name/local path> 
+pixi run python run_benchmark_evals.py --model <HF model name/local path>  {optional: --results-dir <dir>}
 
 # same as prev but for latency
 pixi run python run_latency_evals.py --models-dir <local path to gptq/HF saved model>

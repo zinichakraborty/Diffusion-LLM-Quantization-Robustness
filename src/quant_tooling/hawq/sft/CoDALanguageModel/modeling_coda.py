@@ -407,6 +407,7 @@ class CoDALanguageModel(DLMGenerationMixin, PreTrainedModel):
         attention_mask: torch.FloatTensor | None = None,
         src_mask: torch.BoolTensor | None = None,
         training_mode: str = "pretrain",
+        calc_sens: bool = False
         **kwargs,
     ) -> tuple[torch.FloatTensor, torch.FloatTensor | None]:
         if not self.training:
@@ -566,16 +567,18 @@ class CoDALanguageModel(DLMGenerationMixin, PreTrainedModel):
         n_power = 100
 
         sens = {}
+        if calc_sens:
+            sens = self.compute_layer_sensitivity(
+                noisy_input_ids=noisy_input_ids,
+                target_ids=target_ids,
+                loss_mask=loss_mask,
+                dsigma=dsigma,
+                attention_mask=attention_mask,
+                num_power_iterations=n_power,
+            )
 
-        # sens = self.compute_layer_sensitivity(
-        #     noisy_input_ids=noisy_input_ids,
-        #     target_ids=target_ids,
-        #     loss_mask=loss_mask,
-        #     dsigma=dsigma,
-        #     attention_mask=attention_mask,
-        #     num_power_iterations=n_power,
-        # )
-        # print(sens)
+        # end sysml ------------------------------------------
+
         return logits, loss, sens
 
 
@@ -720,7 +723,3 @@ class CoDALanguageModel(DLMGenerationMixin, PreTrainedModel):
         assert sensitivities != {}, f"sens"
         # print(sensitivities)
         return sensitivities
-
-# pixi run python main.py --sensitivities /storage/ice1/0/7/agupta965/research2/hawq/guru/coda_sensitivities_from_aarav.json --splits 30/40/30 --save-dir /storage/ice1/0/7/agupta965/checkpoints/coda_hawq
-# nohup pixi run python qat_sft.py --model_name /storage/ice1/0/7/agupta965/checkpoints/coda_hawq --num_epochs 10 --task wikitext2
-# pixi run python main.py --sensitivities /storage/ice1/0/7/agupta965/research2/hawq/guru/coda_sensitivities_from_aarav.json --splits 30/40/30 --save-dir /storage/ice1/0/7/agupta965/checkpoints/coda_hawq --modelname /storage/ice1/0/7/agupta965/checkpoints/coda_hawq

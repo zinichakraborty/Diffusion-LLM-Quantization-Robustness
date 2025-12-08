@@ -557,29 +557,29 @@ def train_coda_ddm_sft(
         raise ValueError(f"Unknown task '{task}'. Supported: 'gsm8k', 'wikitext2'.")
 
 
-    # randomly select 10% of dataset as representative subset
+    # randomly select 5% of dataset as representative subset
     # to avoid issues with high latency of hessian computation
-    # fraction = 0.05
-    # num_samples = int(len(train_dataset) * fraction)
+    fraction = 0.05
+    num_samples = int(len(train_dataset) * fraction)
 
-    # indices = np.random.choice(len(train_dataset), num_samples, replace=False)
-    # subset = Subset(train_dataset, indices)
-
-    # train_loader = DataLoader(
-    #     subset,
-    #     batch_size=batch_size,
-    #     shuffle=True,
-    #     num_workers=0,
-    #     pin_memory=torch.cuda.is_available(),
-    # )
+    indices = np.random.choice(len(train_dataset), num_samples, replace=False)
+    subset = Subset(train_dataset, indices)
 
     train_loader = DataLoader(
-        train_dataset,
+        subset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=0,
         pin_memory=torch.cuda.is_available(),
     )
+
+    # train_loader = DataLoader(
+    #     train_dataset,
+    #     batch_size=batch_size,
+    #     shuffle=True,
+    #     num_workers=0,
+    #     pin_memory=torch.cuda.is_available(),
+    # )
 
     print(f"Batches per epoch: {len(train_loader)}")
 
@@ -651,6 +651,7 @@ def train_coda_ddm_sft(
                     labels=input_ids,
                     training_mode=training_mode,
                     epoch=epoch,
+                    calc_sens=True
                 )
             except TypeError:
                 # Fallback if CoDA doesn't take training_mode/epoch/etc.
@@ -697,16 +698,16 @@ def train_coda_ddm_sft(
             # print(type(sensitivity_tracking))
 
             # Gradient accumulation
-            loss_to_backprop = loss / gradient_accumulation_steps
-            loss_to_backprop.backward()
+            # loss_to_backprop = loss / gradient_accumulation_steps
+            # loss_to_backprop.backward()
 
-            if (batch_idx + 1) % gradient_accumulation_steps == 0:
-                # Clip grads
-                if max_grad_norm is not None:
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+            # if (batch_idx + 1) % gradient_accumulation_steps == 0:
+            #     # Clip grads
+            #     if max_grad_norm is not None:
+            #         torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
 
-                optimizer.step()
-                optimizer.zero_grad(set_to_none=True)
+            #     optimizer.step()
+            #     optimizer.zero_grad(set_to_none=True)
 
             global_step += 1
             epoch_loss += loss.item()
