@@ -9,8 +9,6 @@ Research repository for research2.
 5. Run `pixi install` to setup virtual environment
 6. Run `exit`
 
-To test running `LLaDA-8B-Instruct`, run `pixi run poe test_execute_model`
-
 ## GPTQ
 
 @Guru fill in
