@@ -142,5 +142,5 @@ if __name__ == "__main__":
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
     for b in BITS:
-        print(f"Quantizing Qwen3 {QWEN3_ID} at {b} bits…")
+        print(f"Quantizing Qwen3 {QWEN3_ID} at {b} bits")
         quantize_model(QWEN3_ID, b, CALIBRATION_DATASET, device="cuda", use_qwen3_hooks=True)

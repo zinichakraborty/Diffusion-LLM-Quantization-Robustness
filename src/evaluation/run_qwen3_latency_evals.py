@@ -3,7 +3,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from CoDA.evaluation.utils.qwen_latency_utils import (
+from utils.qwen_latency_utils import (
     JOB_NAME_TEMPLATE,
     LOG_FILE_PATH_TEMPLATE,
     MEM,

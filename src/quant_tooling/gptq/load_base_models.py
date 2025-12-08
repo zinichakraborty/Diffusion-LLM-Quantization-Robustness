@@ -42,7 +42,7 @@ def save_bf16_model(model_id: str, device: str = "cuda") -> str:
     model = AutoModel.from_pretrained(
         model_id,
         trust_remote_code=True,
-        dtype=torch.bfloat16,
+        torch_dtype=torch.bfloat16,
         device_map=device,
         attn_implementation="eager",
     )

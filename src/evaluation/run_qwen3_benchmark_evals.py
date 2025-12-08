@@ -3,7 +3,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from CoDA.evaluation.utils.qwen_eval_utils import (
+from utils.qwen_eval_utils import (
     EVALUATION_SETS,
     SCRIPT_TEMPLATE,
     JOB_NAME_TEMPLATE,
