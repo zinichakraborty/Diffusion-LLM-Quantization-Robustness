@@ -2,7 +2,6 @@ import os
 import torch
 from transformers import AutoModel, AutoTokenizer, GenerationConfig
 from optimum.gptq import GPTQQuantizer
-from safetensors.torch import save_model
 
 BITS = [2, 3, 4, 8]
 MODEL_ID = "Salesforce/CoDA-v0-Instruct"
