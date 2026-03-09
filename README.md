@@ -1,5 +1,6 @@
-# research2
-Research repository for research2.
+# Intelligent Diffusion LLM Quantization
+
+[Intelligent_Quantization_for_Diffusion_LLMs.pdf](https://github.com/user-attachments/files/25829442/Intelligent_Quantization_for_Diffusion_LLMs.pdf)
 
 We extensively use PACE ICE for our experiments. If this is your first time or you are new to PACE, please follow this [PACE ICE guide](https://github.com/guru-desh/Intro-To-PACE-ICE) made by Guru. These instructions assume that a user's PACE environment is configured according to the guide.
 
